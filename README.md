@@ -1,126 +1,219 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Mr. Total
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A Telegram bot that reports the combined balance across several brokerage, exchange and wallet accounts.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The bot only ever **reads** balances. Every credential below is set up so that it cannot trade, withdraw or move funds. If a vendor asks you to grant anything beyond read access, don't.
 
-## Description
+| Vendor              | What you need                       | Read-only by design | Expires                     |
+| ------------------- | ----------------------------------- | ------------------- | --------------------------- |
+| Interactive Brokers | Flex Web Service token + Query ID   | Yes                 | Up to 1 year                |
+| Binance             | API key + secret                    | Yes, if configured  | Never (with IP restriction) |
+| Bybit               | API key + secret                    | Yes, if configured  | 3 months without IP binding |
+| Telegram Wallet     | TON wallet address                  | Yes, no secret      | Never                       |
+| Polymarket          | Proxy wallet address                | Yes, no secret      | Never                       |
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+> Vendor UIs change. If a menu item has moved, look for the same wording nearby.
 
-## Project setup
+---
 
-```bash
-$ npm install
+## Daily snapshot
+
+Once a day, without any command, the bot takes a snapshot of every balance and saves it to the database. The snapshots are the data for 1D comparison charts.
+
+**Schedule:** every day at **06:00 UTC**, weekends included. The time is fixed in UTC, so it does not depend on the server's timezone or on daylight saving time.
+
+---
+
+## Interactive Brokers (Flex Web Service)
+
+Flex Web Service returns a report that you define once in Client Portal. The token can only download reports, so it is read-only by design.
+
+**Note:** the data is as of the close of the previous business day. It is not real-time.
+
+### 1. Create a Flex Query
+
+1. Log in to [Client Portal](https://www.interactivebrokers.com/portal).
+2. Go to **Performance & Reports → Flex Queries**.
+3. Next to **Activity Flex Query**, click **+** (Create).
+4. Give it a name, e.g. `total-bot`.
+5. Under **Sections**, enable:
+   - **Net Asset Value (NAV) in Base**: the total account value
+   - **Cash Report**: cash per currency
+   - **Open Positions**: optional, for a per-position breakdown
+6. Under **Delivery Configuration**:
+   - **Format**: `XML`
+   - **Period**: `Last Business Day`
+7. Save, then note the **Query ID** shown in the list of queries.
+
+### 2. Generate a Flex Web Service token
+
+1. On the same **Flex Queries** page, click the gear icon next to **Flex Web Service Configuration**.
+2. Turn **Flex Web Service Status** on.
+3. Click **Generate New Token**.
+4. Choose the longest expiration (**1 year**).
+5. Optional but recommended: restrict the token to your server's IP address.
+6. Copy the token.
+
+Generating a new token invalidates the previous one. A token can't be made permanent: once it expires, generate a new one and update it in the bot.
+
+### What the bot stores
+
+- `token`
+- `queryId`
+
+### How it is read
+
+Fetching a report takes two steps:
+
+```
+GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendRequest?t={token}&q={queryId}&v=3
+  → returns a ReferenceCode
+
+GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement?t={token}&q={referenceCode}&v=3
+  → returns the XML report (retry after a few seconds if it isn't ready yet)
 ```
 
-## Compile and run the project
+Send a `User-Agent` header with each request. Error code `1012` means the token has expired, and `1015` means it is invalid.
 
-```bash
-# development
-$ npm run start
+---
 
-# watch mode
-$ npm run start:dev
+## Binance
 
-# production mode
-$ npm run start:prod
-```
+### 1. Create the key
 
-## Run tests
+1. Log in to [binance.com](https://www.binance.com). Identity verification and 2FA must be enabled on the account.
+2. Open **Profile → Account → API Management**.
+3. Click **Create API**, choose **System generated** (HMAC), and enter a label, e.g. `total-bot`.
+4. Complete the 2FA check.
+5. Copy the **API Key** and the **Secret Key**. The secret is shown **only once**.
 
-```bash
-# unit tests
-$ npm run test
+### 2. Restrict it
 
-# e2e tests
-$ npm run test:e2e
+Click **Edit restrictions** on the new key:
 
-# test coverage
-$ npm run test:cov
-```
+- **Enable Reading**: on (the only permission that should be enabled)
+- **Enable Spot & Margin Trading**: off
+- **Enable Futures**: off
+- **Enable Withdrawals**: off
+- every other permission: off
+- **Restrict access to trusted IPs only**: on, with your server's IP address
 
-## Deployment
+Save.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### What the bot stores
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- `apiKey`
+- `apiSecret`
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### How it is read
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Signed requests send the `X-MBX-APIKEY` header plus `timestamp` and `signature` (HMAC-SHA256 of the query string) parameters.
 
-## Observability
+- `POST /sapi/v1/asset/wallet/balance`: balance of every wallet (Spot, Funding, Futures, Earn, …), in BTC
+- `GET /api/v3/account`: Spot balances per coin
+- `GET /sapi/v1/simple-earn/flexible/position`: Simple Earn positions
+- `GET /api/v3/ticker/price`: public prices, used to convert to USD
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+---
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+## Bybit
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+### 1. Create the key
 
-This project is already instrumented. To connect it, run this and approve the code it prints at [observe.nestjs.com/link](https://observe.nestjs.com/link) - signing up for free if you have no account:
+1. Log in to [bybit.com](https://www.bybit.com) and enable 2FA.
+2. Open **Profile → API**.
+3. Click **Create New Key → System-generated API Keys**.
+4. Choose **API Transaction** as the usage type, and enter a name, e.g. `total-bot`.
 
-```bash
-$ npx @nestjs/observe link
-```
+### 2. Restrict it
 
-It writes the app key and secret into `.env` and makes every `nest start` script (`start`, `start:dev`, `start:debug`) load it. In production, set `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment instead.
+- **API Key Permissions**: **Read-Only**
+- Leave every permission checkbox (Orders, Positions, Withdrawal, Transfer, …) unchecked
+- **IP restriction**: choose **Only IPs with permissions granted are allowed to access the OpenAPI** and enter your server's IP address
 
-Or do it by hand: create an application and an API key at [observe.nestjs.com](https://observe.nestjs.com), and set the pair as `OBSERVE_APP_KEY` and `OBSERVE_APP_SECRET` in the environment the app runs in.
+Submit, pass the 2FA check, and copy the **API Key** and **API Secret**. The secret is shown **only once**.
 
-The free plan needs no payment details and covers 300,000 events a month. You can also browse the [live demo](https://www.observe-demo.nestjs.com/dashboard) first - the whole dashboard over a busy service's data, with nothing to install.
+A key without an IP restriction expires after **3 months**. A key bound to an IP address doesn't expire.
 
-## Resources
+### What the bot stores
 
-Check out a few resources that may come in handy when working with NestJS:
+- `apiKey`
+- `apiSecret`
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observe](https://observe.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### How it is read
 
-## Support
+Requests are signed with the `X-BAPI-API-KEY`, `X-BAPI-TIMESTAMP`, `X-BAPI-RECV-WINDOW` and `X-BAPI-SIGN` headers. `X-BAPI-SIGN` is an HMAC-SHA256 signature.
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- `GET /v5/account/wallet-balance?accountType=UNIFIED`: Unified Trading Account, including `totalEquity` in USD
+- `GET /v5/asset/transfer/query-account-coins-balance?accountType=FUND`: Funding account
+- `GET /v5/earn/position`: Earn positions
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Telegram Wallet
 
-## License
+The `@wallet` bot has two parts, and only one of them can be read:
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+| Part                                         | Readable | Why                                                                                                     |
+| -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
+| **Crypto wallet** (custodial)                | No       | Telegram offers no API for your own balance. Wallet Pay API is for merchants and doesn't return balances. |
+| **TON Wallet** (self-custodial, formerly TON Space) | Yes      | It is an ordinary TON blockchain address, and anyone can read its balance.                               |
+
+To track funds held in Telegram Wallet, keep them in the TON Wallet part. Otherwise, enter the custodial balance in the bot by hand.
+
+### 1. Get the address
+
+1. Open [@wallet](https://t.me/wallet) in Telegram.
+2. Switch to **TON Wallet**.
+3. Tap **Receive** and copy the address (`UQ…` / `EQ…`).
+
+No keys or secrets are needed. Never share the recovery phrase.
+
+### What the bot stores
+
+- `address`
+
+### How it is read
+
+Use a public TON API:
+
+- `GET https://tonapi.io/v2/accounts/{address}`: TON balance (in nanotons)
+- `GET https://tonapi.io/v2/accounts/{address}/jettons?currencies=usd`: tokens such as USDT, with USD prices
+
+Alternatively, use [toncenter.com](https://toncenter.com). Without an API key it is limited to 1 request per second. You can get a free key from [@tonapibot](https://t.me/tonapibot).
+
+---
+
+## Polymarket
+
+Polymarket runs on Polygon, and your funds sit in a **proxy wallet** that Polymarket created for you. All of its data is public, so no API key is needed.
+
+Don't use the CLOB API keys for this. They are derived from your private key and can place orders.
+
+### 1. Get the proxy wallet address
+
+1. Log in to [polymarket.com](https://polymarket.com).
+2. Open your profile (avatar → **Profile**).
+3. Copy the `0x…` address shown there.
+
+This is the proxy wallet address. It is **not** the same as the address of the wallet or email login you sign in with.
+
+### What the bot stores
+
+- `address`
+
+### How it is read
+
+- `GET https://data-api.polymarket.com/value?user={address}`: current value of open positions, in USD
+- `GET https://data-api.polymarket.com/positions?user={address}`: list of open positions
+- Cash: call `balanceOf(address)` on the USDC.e contract on Polygon (`0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`, 6 decimals) through any Polygon RPC endpoint
+
+---
+
+## Security checklist
+
+- Grant read permissions only. Never enable trading, transfers or withdrawals.
+- Bind every key that supports it to your server's IP address.
+- Keep secrets out of git and out of logs.
+- The bot must answer only to your own Telegram `chat_id`.
+- If a key leaks, delete it in the vendor's UI right away and create a new one.
