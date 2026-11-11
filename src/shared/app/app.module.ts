@@ -4,6 +4,7 @@ import { createObserveModule } from '@nestjs/observe';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from '../database/database.module.js';
+import { TelegramModule } from '../telegram/telegram.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -20,6 +21,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     // .env is already loaded by `nest start --env-file .env`.
     ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true }),
     DatabaseModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService],

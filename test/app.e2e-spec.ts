@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
+import { Bot } from 'grammy';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from '../src/shared/app/app.module.js';
@@ -10,7 +11,11 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      // No real bot token in tests.
+      .overrideProvider(Bot)
+      .useValue({ isRunning: () => false })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
