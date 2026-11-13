@@ -4,13 +4,13 @@ A Telegram bot that reports the combined balance across several brokerage, excha
 
 The bot only ever **reads** balances. Every credential below is set up so that it cannot trade, withdraw or move funds. If a vendor asks you to grant anything beyond read access, don't.
 
-| Vendor              | What you need                       | Read-only by design | Expires                     |
-| ------------------- | ----------------------------------- | ------------------- | --------------------------- |
-| Interactive Brokers | Flex Web Service token + Query ID   | Yes                 | Up to 1 year                |
-| Binance             | API key + secret                    | Yes, if configured  | Never (with IP restriction) |
-| Bybit               | API key + secret                    | Yes, if configured  | 3 months without IP binding |
-| Telegram Wallet     | TON wallet address                  | Yes, no secret      | Never                       |
-| Polymarket          | Proxy wallet address                | Yes, no secret      | Never                       |
+| Vendor              | What you need                     | Read-only by design | Expires                     |
+| ------------------- | --------------------------------- | ------------------- | --------------------------- |
+| Interactive Brokers | Flex Web Service token + Query ID | Yes                 | Up to 1 year                |
+| Binance             | API key + secret                  | Yes, if configured  | Never (with IP restriction) |
+| Bybit               | API key + secret                  | Yes, if configured  | 3 months without IP binding |
+| Telegram Walt       | Assets and APY, entered by hand   | Yes, no credentials | Never                       |
+| Polymarket          | Proxy wallet address              | Yes, no secret      | Never                       |
 
 > Vendor UIs change. If a menu item has moved, look for the same wording nearby.
 
@@ -35,7 +35,7 @@ Flex Web Service returns a report that you define once in Client Portal. The tok
 1. Log in to [Client Portal](https://www.interactivebrokers.com/portal).
 2. Go to **Performance & Reports → Flex Queries**.
 3. Next to **Activity Flex Query**, click **+** (Create).
-4. Give it a name, e.g. `total-bot`.
+4. Give it a name, e.g. `mr-total-bot`.
 5. Under **Sections**, enable:
    - **Net Asset Value (NAV) in Base**: the total account value
    - **Cash Report**: cash per currency
@@ -73,8 +73,6 @@ GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetSt
   → returns the XML report (retry after a few seconds if it isn't ready yet)
 ```
 
-Send a `User-Agent` header with each request. Error code `1012` means the token has expired, and `1015` means it is invalid.
-
 ---
 
 ## Binance
@@ -83,7 +81,7 @@ Send a `User-Agent` header with each request. Error code `1012` means the token 
 
 1. Log in to [binance.com](https://www.binance.com). Identity verification and 2FA must be enabled on the account.
 2. Open **Profile → Account → API Management**.
-3. Click **Create API**, choose **System generated** (HMAC), and enter a label, e.g. `total-bot`.
+3. Click **Create API**, choose **System generated** (HMAC), and enter a label, e.g. `mr-total-bot`.
 4. Complete the 2FA check.
 5. Copy the **API Key** and the **Secret Key**. The secret is shown **only once**.
 
@@ -123,7 +121,7 @@ Signed requests send the `X-MBX-APIKEY` header plus `timestamp` and `signature` 
 1. Log in to [bybit.com](https://www.bybit.com) and enable 2FA.
 2. Open **Profile → API**.
 3. Click **Create New Key → System-generated API Keys**.
-4. Choose **API Transaction** as the usage type, and enter a name, e.g. `total-bot`.
+4. Choose **API Transaction** as the usage type, and enter a name, e.g. `mr-total-bot`.
 
 ### 2. Restrict it
 
@@ -150,37 +148,19 @@ Requests are signed with the `X-BAPI-API-KEY`, `X-BAPI-TIMESTAMP`, `X-BAPI-RECV-
 
 ---
 
-## Telegram Wallet
+## Telegram Walt
 
-The `@wallet` bot has two parts, and only one of them can be read:
+Telegram Walt ([@wallet](https://t.me/wallet)) is a single provider in the bot, and every asset in it is entered by hand. This covers both parts of the app:
 
-| Part                                         | Readable | Why                                                                                                     |
-| -------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------- |
-| **Crypto wallet** (custodial)                | No       | Telegram offers no API for your own balance. Wallet Pay API is for merchants and doesn't return balances. |
-| **TON Wallet** (self-custodial, formerly TON Space) | Yes      | It is an ordinary TON blockchain address, and anyone can read its balance.                               |
+- **Custodial:** there is no way to read it automatically. Telegram offers no API for your own balance, and Wallet Pay API is for merchants and doesn't return balances. The Walt MCP server (`https://walletbot.me/bot-relay/public-api/mcp`) only covers Walt Perps: its `balance_get` tool returns Perps account balances, not the wallet. Logging in as your Telegram account (MTProto) to call the Mini App's private API would work technically, but the session gives full control of the Telegram account, including Walt itself. The bot doesn't do this.
+- **Self-custodial:** it could be read from the blockchain, but its assets can sit on different networks (TON, Solana, …), each with its own address and API. Entering them by hand keeps all of Walt in one list.
 
-To track funds held in Telegram Wallet, keep them in the TON Wallet part. Otherwise, enter the custodial balance in the bot by hand.
+### What you enter
 
-### 1. Get the address
+- **Assets:** the amount of every asset, custodial and self-custodial alike, e.g. `GRAM 12.5`, `USDT 40`, `SOL 0.8`. Update an asset whenever its amount changes for a reason the bot can't predict: a deposit, a withdrawal, a transfer or a swap.
+- **APY rates:** for every asset in Earn or staking, the APY shown in Walt. When Walt changes a rate, enter the new one. The old rate is kept for the period before the change.
 
-1. Open [@wallet](https://t.me/wallet) in Telegram.
-2. Switch to **TON Wallet**.
-3. Tap **Receive** and copy the address (`UQ…` / `EQ…`).
-
-No keys or secrets are needed. Never share the recovery phrase.
-
-### What the bot stores
-
-- `address`
-
-### How it is read
-
-Use a public TON API:
-
-- `GET https://tonapi.io/v2/accounts/{address}`: TON balance (in nanotons)
-- `GET https://tonapi.io/v2/accounts/{address}/jettons?currencies=usd`: tokens such as USDT, with USD prices
-
-Alternatively, use [toncenter.com](https://toncenter.com). Without an API key it is limited to 1 request per second. You can get a free key from [@tonapibot](https://t.me/tonapibot).
+Assets are converted to USD with public prices from the same Binance `GET /api/v3/ticker/price` endpoint as above. Prices are quoted in USDT, and USDT counts as 1 USD.
 
 ---
 
