@@ -8,7 +8,7 @@ import type {
   AccountSnapshotSource,
   PositionSnapshot,
 } from '../account-snapshot.interface.js';
-import { byAmountDesc, sumAmounts } from '../positions.js';
+import { byAmountDesc, sumAmounts, todayAsOf } from '../positions.js';
 import { PolymarketAccount } from './polymarket-account.entity.js';
 import polymarketConfig from './polymarket.config.js';
 
@@ -76,6 +76,7 @@ export class PolymarketService implements AccountSnapshotSource<PolymarketAccoun
     return {
       usdAmount: value.data.value + sumAmounts(cashPositions),
       positions: [...positions.sort(byAmountDesc), ...cashPositions],
+      asOf: todayAsOf(),
     };
   }
 

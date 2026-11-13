@@ -29,6 +29,8 @@ Flex Web Service returns a report that you define once in Client Portal. The tok
 5. Under **Sections**, enable:
    - **Net Asset Value (NAV) in Base**: the value of every sub-account, in its base currency
    - **Conversion Rates**: to total the sub-accounts in USD
+   - **Open Positions**, level of detail **Summary**: every position, for the detailed IBKR report
+   - **Cash Report**, with **Currency Breakout**: cash in every currency, for the detailed IBKR report
 6. Under **Delivery Configuration**:
    - **Format**: `XML`
    - **Period**: `Last Business Day`
@@ -49,6 +51,7 @@ Generating a new token invalidates the previous one. A token can't be made perma
 
 - `token`
 - `queryId`
+- `displayType`: how the account appears in the owner's total, `short` (default) or `full`
 
 ### How it is read
 
@@ -61,6 +64,13 @@ GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/SendR
 GET https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService/GetStatement?t={token}&q={referenceCode}&v=3
   → returns the XML report (retry after a few seconds if it isn't ready yet)
 ```
+
+The same report feeds two views:
+
+- **Short**: one line per sub-account, with its value from **NAV in Base**.
+- **Full**: the same sub-accounts, each with its positions from **Open Positions** and then its cash per currency from **Cash Report**. When a sub-account holds cash only in its base currency, the report has no per-currency lines, so the cash is taken from the base summary. Cash under half a cent is left out.
+
+The total is taken from NAV in both views. The owner's total uses the short view when `displayType` is `short` and the full view when it is `full`. The IBKR account endpoint always uses the full view.
 
 ---
 

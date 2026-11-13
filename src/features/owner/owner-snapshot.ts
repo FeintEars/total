@@ -13,6 +13,7 @@ export interface OutputSnapshot {
   amount: number;
   currency: 'USD';
   positions: PositionSnapshot[];
+  asOf: string;
 }
 
 export interface OutputSnapshotError {

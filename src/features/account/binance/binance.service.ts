@@ -7,7 +7,7 @@ import type {
   AccountSnapshot,
   AccountSnapshotSource,
 } from '../account-snapshot.interface.js';
-import { mergePositions } from '../positions.js';
+import { mergePositions, todayAsOf } from '../positions.js';
 import { PricesService, usdPosition } from '../prices/prices.service.js';
 import { BinanceAccount } from './binance-account.entity.js';
 
@@ -108,7 +108,7 @@ export class BinanceService implements AccountSnapshotSource<BinanceAccount> {
       ...locked.map((row) => position(row.asset, toNumber(row.amount))),
     ]);
 
-    return { usdAmount: totalBtc * btcPrice, positions };
+    return { usdAmount: totalBtc * btcPrice, positions, asOf: todayAsOf() };
   }
 
   private async earnRows<T>(account: BinanceAccount, path: string) {

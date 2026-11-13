@@ -39,11 +39,13 @@ describe('OwnerService.getSnapshot', () => {
   it('collects inputs and a snapshot of every account of the owner', async () => {
     const ibkr = source('IBKR', ['ibkr-1', 'ibkr-2'], async ({ id }) => ({
       usdAmount: id === 'ibkr-1' ? 100.004 : 200,
+      asOf: '2026-11-12',
       positions: [{ name: 'Inflation Hedge', amount: 99.999, currency: 'PLN' }],
     }));
     const earns = {
       ...source('Earns', ['earns-1'], async () => ({
         usdAmount: 5,
+        asOf: '2026-11-14',
         positions: [
           { name: 'GRAM', quantity: 3, amount: null, currency: 'USD' },
         ],
@@ -69,6 +71,7 @@ describe('OwnerService.getSnapshot', () => {
         amount: 100,
         currency: 'USD',
         positions: [{ name: 'Inflation Hedge', amount: 100, currency: 'PLN' }],
+        asOf: '2026-11-12',
       },
       expect.objectContaining({ id: 'ibkr-2', name: 'IBKR', amount: 200 }),
       expect.objectContaining({
@@ -92,6 +95,7 @@ describe('OwnerService.getSnapshot', () => {
     });
     const bybit = source('Bybit', ['bybit-1'], async () => ({
       usdAmount: 1,
+      asOf: '2026-11-14',
       positions: [],
     }));
 

@@ -2,7 +2,9 @@ import { toNumber } from '../../../shared/http/http.js';
 import type {
   AccountSnapshot,
   PositionSnapshot,
+  SubpositionSnapshot,
 } from '../account-snapshot.interface.js';
+import { roundMoney, todayAsOf } from '../positions.js';
 
 const ENTITIES: Record<string, string> = {
   amp: '&',
@@ -43,73 +45,203 @@ export function elementsAttributes(
   );
 }
 
+type FlexPosition = PositionSnapshot & { amount: number };
+
 export function parseFlexStatements(xml: string): AccountSnapshot {
+  const statements = flexStatements(xml);
+  const toUsd = usdRates(xml);
+  const subAccounts = statements.map(parseSubAccount);
+  return withReportDate(xml, {
+    usdAmount: totalUsd(subAccounts, toUsd),
+    positions: sortByUsd(subAccounts, toUsd),
+  });
+}
+
+export function parseFlexPositions(xml: string): AccountSnapshot {
+  const statements = flexStatements(xml);
+  const toUsd = usdRates(xml);
+  const subAccounts = statements.map((statement) => {
+    const subAccount = parseSubAccount(statement);
+    return {
+      ...subAccount,
+      subpositions: [
+        parseOpenPositions(statement),
+        parseCash(statement, subAccount.currency),
+      ].flatMap((subpositions) =>
+        sortByUsd(
+          subpositions.filter((subposition) => !isZero(subposition)),
+          toUsd,
+        ),
+      ),
+    };
+  });
+  return withReportDate(xml, {
+    usdAmount: totalUsd(subAccounts, toUsd),
+    positions: sortByUsd(subAccounts, toUsd),
+  });
+}
+
+function withReportDate(
+  xml: string,
+  snapshot: Omit<AccountSnapshot, 'asOf'>,
+): AccountSnapshot {
+  const date = elementsAttributes(xml, 'FlexStatement')
+    .map(({ toDate = '' }) => toDate)
+    .filter((toDate) => /^\d{8}$/.test(toDate))
+    .sort()
+    .at(-1);
+  return {
+    ...snapshot,
+    asOf: date
+      ? `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6)}`
+      : todayAsOf(),
+  };
+}
+
+function flexStatements(xml: string): string[] {
   const statements = [
     ...xml.matchAll(/<FlexStatement[\s>][\s\S]*?<\/FlexStatement>/g),
   ].map(([statement]) => statement);
   if (statements.length === 0) {
     throw new Error('IBKR report has no FlexStatement');
   }
+  return statements;
+}
 
-  const toUsd = usdRates(xml);
-  const subAccounts = statements
-    .map((statement) => {
-      const position = parseSubAccount(statement);
-      return {
-        position,
-        usdAmount: position.amount * toUsd(position.currency),
-      };
-    })
-    .sort((a, b) => b.usdAmount - a.usdAmount);
+function totalUsd(
+  positions: FlexPosition[],
+  toUsd: (currency: string) => number,
+): number {
+  return positions.reduce(
+    (total, { amount, currency }) => total + amount * toUsd(currency),
+    0,
+  );
+}
 
-  return {
-    usdAmount: subAccounts.reduce(
-      (total, { usdAmount }) => total + usdAmount,
-      0,
-    ),
-    positions: subAccounts.map(({ position }) => position),
-  };
+function sortByUsd<T extends { amount: number; currency: string }>(
+  positions: T[],
+  toUsd: (currency: string) => number,
+): T[] {
+  return positions
+    .map((position) => ({
+      position,
+      usdAmount: position.amount * toUsd(position.currency),
+    }))
+    .sort((a, b) => b.usdAmount - a.usdAmount)
+    .map(({ position }) => position);
 }
 
 function usdRates(xml: string): (currency: string) => number {
-  const rates = new Map<string, { date: string; rate: number }>();
+  const latest = new Map<string, { date: string; rate: number }>();
   for (const {
     fromCurrency,
     toCurrency,
     rate,
     reportDate = '',
   } of elementsAttributes(xml, 'ConversionRate')) {
-    const pairs: [string, number][] = [];
-    if (toCurrency === 'USD') {
-      pairs.push([fromCurrency, toNumber(rate)]);
-    } else if (fromCurrency === 'USD' && toNumber(rate) !== 0) {
-      pairs.push([toCurrency, 1 / toNumber(rate)]);
+    const value = toNumber(rate);
+    if (!fromCurrency || !toCurrency || value === 0) {
+      continue;
     }
-    for (const [currency, usdRate] of pairs) {
-      const known = rates.get(currency);
-      if (!known || reportDate > known.date) {
-        rates.set(currency, { date: reportDate, rate: usdRate });
-      }
+    const pair = `${fromCurrency}/${toCurrency}`;
+    const known = latest.get(pair);
+    if (!known || reportDate > known.date) {
+      latest.set(pair, { date: reportDate, rate: value });
     }
   }
+
+  const rate = (from: string, to: string) => latest.get(`${from}/${to}`)?.rate;
+  const pivots = new Set([...latest.keys()].map((pair) => pair.split('/')[1]));
 
   return (currency) => {
     if (currency === 'USD') {
       return 1;
     }
-    const rate = rates.get(currency)?.rate;
-    if (rate === undefined) {
-      throw new Error(
-        `IBKR report has no ${currency}/USD rate: enable "Conversion Rates" in the Flex Query`,
-      );
+    const direct = rate(currency, 'USD');
+    if (direct !== undefined) {
+      return direct;
     }
-    return rate;
+    const inverse = rate('USD', currency);
+    if (inverse !== undefined) {
+      return 1 / inverse;
+    }
+    for (const pivot of pivots) {
+      const toPivot = rate(currency, pivot);
+      const usdToPivot = rate('USD', pivot);
+      if (toPivot !== undefined && usdToPivot !== undefined) {
+        return toPivot / usdToPivot;
+      }
+    }
+    throw new Error(
+      `IBKR report has no ${currency}/USD rate: enable "Conversion Rates" in the Flex Query`,
+    );
   };
 }
 
-function parseSubAccount(
+function section(statement: string, tag: string, flexName: string): string {
+  const match = new RegExp(
+    `<${tag}(?:\\s[^>]*?)?(?:/>|>([\\s\\S]*?)</${tag}>)`,
+  ).exec(statement);
+  if (!match) {
+    throw new Error(
+      `IBKR report has no ${flexName}: enable "${flexName}" in the Flex Query`,
+    );
+  }
+  return match[1] ?? '';
+}
+
+function parseOpenPositions(statement: string): SubpositionSnapshot[] {
+  return elementsAttributes(
+    section(statement, 'OpenPositions', 'Open Positions'),
+    'OpenPosition',
+  )
+    .filter(
+      ({ levelOfDetail }) => !levelOfDetail || levelOfDetail === 'SUMMARY',
+    )
+    .map(({ symbol, description, position, positionValue, currency }) => ({
+      name: symbol || description,
+      quantity: toNumber(position),
+      amount: toNumber(positionValue),
+      currency,
+    }));
+}
+
+function parseCash(
   statement: string,
-): PositionSnapshot & { amount: number } {
+  baseCurrency: string,
+): SubpositionSnapshot[] {
+  const rows = elementsAttributes(
+    section(statement, 'CashReport', 'Cash Report'),
+    'CashReportCurrency',
+  );
+  const byCurrency = rows.filter(
+    ({ currency, levelOfDetail }) =>
+      currency !== 'BASE_SUMMARY' &&
+      (!levelOfDetail || levelOfDetail === 'Currency'),
+  );
+  const summary = rows.find(({ currency }) => currency === 'BASE_SUMMARY');
+  const cash =
+    byCurrency.length > 0 || !summary
+      ? byCurrency
+      : [{ ...summary, currency: baseCurrency }];
+  return cash.map(({ currency, endingCash }) => ({
+    name: 'Cash',
+    amount: toNumber(endingCash),
+    currency,
+  }));
+}
+
+function isZero({
+  quantity,
+  amount,
+}: {
+  quantity?: number;
+  amount: number;
+}): boolean {
+  return quantity === undefined ? roundMoney(amount) === 0 : quantity === 0;
+}
+
+function parseSubAccount(statement: string): FlexPosition {
   const nav = elementsAttributes(statement, 'EquitySummaryByReportDateInBase')
     .sort((a, b) => (a.reportDate ?? '').localeCompare(b.reportDate ?? ''))
     .at(-1);

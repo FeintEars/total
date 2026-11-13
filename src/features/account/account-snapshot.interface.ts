@@ -1,13 +1,22 @@
+export interface SubpositionSnapshot {
+  name: string;
+  quantity?: number;
+  amount: number;
+  currency: string;
+}
+
 export interface PositionSnapshot {
   name: string;
   quantity?: number;
   amount: number | null;
   currency: string;
+  subpositions?: SubpositionSnapshot[];
 }
 
 export interface AccountSnapshot {
   usdAmount: number;
   positions: PositionSnapshot[];
+  asOf: string;
 }
 
 export interface AccountSnapshotSource<TAccount extends { id: string }> {

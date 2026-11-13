@@ -29,3 +29,26 @@ export function mergePositions(
 export function byAmountDesc(a: PositionSnapshot, b: PositionSnapshot): number {
   return (b.amount ?? 0) - (a.amount ?? 0);
 }
+
+export function roundMoney(amount: number): number {
+  return Math.round(amount * 100) / 100;
+}
+
+export function roundPositions(
+  positions: PositionSnapshot[],
+): PositionSnapshot[] {
+  return positions.map((position) => ({
+    ...position,
+    amount: position.amount === null ? null : roundMoney(position.amount),
+    ...(position.subpositions && {
+      subpositions: position.subpositions.map((subposition) => ({
+        ...subposition,
+        amount: roundMoney(subposition.amount),
+      })),
+    }),
+  }));
+}
+
+export function todayAsOf(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}

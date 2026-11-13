@@ -7,7 +7,7 @@ import type {
   AccountSnapshot,
   AccountSnapshotSource,
 } from '../account-snapshot.interface.js';
-import { mergePositions, sumAmounts } from '../positions.js';
+import { mergePositions, sumAmounts, todayAsOf } from '../positions.js';
 import {
   PricesService,
   type UsdPrices,
@@ -99,6 +99,7 @@ export class BybitService implements AccountSnapshotSource<BybitAccount> {
     return {
       usdAmount: unifiedTotal + sumAmounts(otherPositions),
       positions: mergePositions([...unifiedPositions, ...otherPositions]),
+      asOf: todayAsOf(),
     };
   }
 

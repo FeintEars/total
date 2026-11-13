@@ -6,6 +6,7 @@ import {
   ACCOUNT_SNAPSHOT_SOURCES,
   type AccountSnapshotSource,
 } from '../account/account-snapshot.interface.js';
+import { roundMoney, roundPositions } from '../account/positions.js';
 import { InputsService } from '../inputs/inputs.service.js';
 import type {
   OutputSnapshot,
@@ -54,17 +55,14 @@ export class OwnerService {
       const { source, account } = accounts[index];
       const name = source.accountName?.(account) ?? source.name;
       if (result.status === 'fulfilled') {
-        const { usdAmount, positions } = result.value;
+        const { usdAmount, positions, asOf } = result.value;
         outputs.push({
           id: account.id,
           name,
           amount: roundMoney(usdAmount),
           currency: 'USD',
-          positions: positions.map((position) => ({
-            ...position,
-            amount:
-              position.amount === null ? null : roundMoney(position.amount),
-          })),
+          positions: roundPositions(positions),
+          asOf,
         });
         return;
       }
@@ -94,8 +92,4 @@ export class OwnerService {
       errors,
     };
   }
-}
-
-function roundMoney(amount: number): number {
-  return Math.round(amount * 100) / 100;
 }

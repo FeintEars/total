@@ -6,7 +6,7 @@ import type {
   AccountSnapshot,
   AccountSnapshotSource,
 } from '../account-snapshot.interface.js';
-import { byAmountDesc, sumAmounts } from '../positions.js';
+import { byAmountDesc, sumAmounts, todayAsOf } from '../positions.js';
 import { PricesService, usdPosition } from '../prices/prices.service.js';
 import type { EarnsBalance } from './earns-balance.entity.js';
 import { Earns } from './earns.entity.js';
@@ -47,7 +47,7 @@ export class EarnsService implements AccountSnapshotSource<Earns> {
       )
       .sort(byAmountDesc);
 
-    return { usdAmount: sumAmounts(positions), positions };
+    return { usdAmount: sumAmounts(positions), positions, asOf: todayAsOf() };
   }
 }
 

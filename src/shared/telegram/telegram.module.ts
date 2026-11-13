@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { Bot } from 'grammy';
 import { TelegramPollingService } from './telegram-polling.service.js';
@@ -17,7 +17,15 @@ import telegramConfig from './telegram.config.js';
         if (!token) {
           throw new Error('TELEGRAM_BOT_TOKEN is not set');
         }
-        return new Bot(token);
+        const bot = new Bot(token);
+        const logger = new Logger('TelegramBot');
+        bot.catch(({ error, ctx }) =>
+          logger.error(
+            `Failed to handle update ${ctx.update.update_id}`,
+            error instanceof Error ? error.stack : error,
+          ),
+        );
+        return bot;
       },
     },
     TelegramPollingService,

@@ -27,12 +27,14 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
   },
   "dependencies": {
+    "@nestjs/cache-manager": "^12.0.5",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.1.1",
     "@nestjs/core": "^12.0.1",
     "@nestjs/observe": "^0.3.0",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/typeorm": "^12.0.3",
+    "cache-manager": "^7.2.9",
     "grammy": "^1.46.0",
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",

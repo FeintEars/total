@@ -4,6 +4,7 @@ import { Bot } from 'grammy';
 import request from 'supertest';
 import { App } from 'supertest/types.js';
 import { AppModule } from '../src/shared/app/app.module.js';
+import { TelegramCommandsService } from '../src/features/telegram-commands/telegram-commands.service.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -13,7 +14,16 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     })
       .overrideProvider(Bot)
-      .useValue({ isRunning: () => false })
+      .useValue({
+        isRunning: () => false,
+        on: vi.fn(),
+        api: { setMyCommands: vi.fn() },
+      })
+      .overrideProvider(TelegramCommandsService)
+      .useValue({
+        listCommands: vi.fn().mockResolvedValue([]),
+        findTargets: vi.fn(),
+      })
       .compile();
 
     app = moduleFixture.createNestApplication();
