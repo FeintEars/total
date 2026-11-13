@@ -4,15 +4,13 @@ A Telegram bot that reports the combined balance across several brokerage, excha
 
 The bot only ever **reads** balances. Every credential below is set up so that it cannot trade, withdraw or move funds. If a vendor asks you to grant anything beyond read access, don't.
 
-| Vendor              | What you need                     | Read-only by design | Expires                     |
-| ------------------- | --------------------------------- | ------------------- | --------------------------- |
-| Interactive Brokers | Flex Web Service token + Query ID | Yes                 | Up to 1 year                |
-| Binance             | API key + secret                  | Yes, if configured  | Never (with IP restriction) |
-| Bybit               | API key + secret                  | Yes, if configured  | 3 months without IP binding |
-| Telegram Walt       | Assets and APY, entered by hand   | Yes, no credentials | Never                       |
-| Polymarket          | Proxy wallet address              | Yes, no secret      | Never                       |
-
-> Vendor UIs change. If a menu item has moved, look for the same wording nearby.
+| Vendor                | What you need                     | Read-only by design | Expires                     |
+| --------------------- | --------------------------------- | ------------------- | --------------------------- |
+| Interactive Brokers   | Flex Web Service token + Query ID | Yes                 | Up to 1 year                |
+| Binance               | API key + secret                  | Yes, if configured  | Never (with IP restriction) |
+| Bybit                 | API key + secret                  | Yes, if configured  | 3 months without IP binding |
+| Earns (Telegram Walt) | Assets and APY, entered by hand   | Yes, no credentials | Never                       |
+| Polymarket            | Proxy wallet address              | Yes, no secret      | Never                       |
 
 ---
 
@@ -148,17 +146,25 @@ Requests are signed with the `X-BAPI-API-KEY`, `X-BAPI-TIMESTAMP`, `X-BAPI-RECV-
 
 ---
 
-## Telegram Walt
+## Earns (Telegram Walt)
 
-Telegram Walt ([@wallet](https://t.me/wallet)) is a single provider in the bot, and every asset in it is entered by hand. This covers both parts of the app:
+Earns tracks assets that the bot can't read through an API. You enter each asset by hand together with its APY, and the bot grows the amount by that APY between your updates.
 
-- **Custodial:** there is no way to read it automatically. Telegram offers no API for your own balance, and Wallet Pay API is for merchants and doesn't return balances. The Walt MCP server (`https://walletbot.me/bot-relay/public-api/mcp`) only covers Walt Perps: its `balance_get` tool returns Perps account balances, not the wallet. Logging in as your Telegram account (MTProto) to call the Mini App's private API would work technically, but the session gives full control of the Telegram account, including Walt itself. The bot doesn't do this.
-- **Self-custodial:** it could be read from the blockchain, but its assets can sit on different networks (TON, Solana, …), each with its own address and API. Entering them by hand keeps all of Walt in one list.
+Currently Earns supports only these currencies:
+
+- `USDT`
+- `GRAM`
+- `SOL`
+- `XAUT`
+
+Any other currency can't be added to Earns.
+
+**Telegram Walt:** the custodial [@wallet](https://t.me/wallet) offers no API to read your own balance, so Telegram Walt assets are tracked through Earns.
 
 ### What you enter
 
-- **Assets:** the amount of every asset, custodial and self-custodial alike, e.g. `GRAM 12.5`, `USDT 40`, `SOL 0.8`. Update an asset whenever its amount changes for a reason the bot can't predict: a deposit, a withdrawal, a transfer or a swap.
-- **APY rates:** for every asset in Earn or staking, the APY shown in Walt. When Walt changes a rate, enter the new one. The old rate is kept for the period before the change.
+- **Assets:** the amount of every asset, e.g. `GRAM 12.5`, `USDT 40`, `SOL 0.8`, `XAUT 0.01`. Update an asset whenever its amount changes for a reason the bot can't predict: a deposit, a withdrawal, a transfer or a swap.
+- **APY rates:** for every asset that earns yield, its current APY. When the rate changes, enter the new one. The old rate is kept for the period before the change.
 
 Assets are converted to USD with public prices from the same Binance `GET /api/v3/ticker/price` endpoint as above. Prices are quoted in USDT, and USDT counts as 1 USD.
 
