@@ -7,6 +7,7 @@ import {
 import { Bot, type Context } from 'grammy';
 import { IbkrService } from '../account/ibkr/ibkr.service.js';
 import { OwnerService } from '../owner/owner.service.js';
+import { TelegramAccessService } from '../telegram-access/telegram-access.service.js';
 import {
   formatCommandList,
   formatFailure,
@@ -38,6 +39,7 @@ export class TelegramCommandsBot
     private readonly commands: TelegramCommandsService,
     private readonly owners: OwnerService,
     private readonly ibkr: IbkrService,
+    private readonly access: TelegramAccessService,
   ) {}
 
   onModuleInit(): void {
@@ -51,6 +53,12 @@ export class TelegramCommandsBot
   async handle(ctx: Context): Promise<void> {
     const command = leadingCommand(ctx);
     if (!command || !isAddressedTo(command, ctx.me.username)) {
+      return;
+    }
+    if (!(await this.access.allows(ctx.chat))) {
+      this.logger.log(
+        `Ignored ${command} in ${ctx.chat?.type ?? 'unknown'} chat ${ctx.chat?.id} from user ${ctx.from?.id}`,
+      );
       return;
     }
 

@@ -3,6 +3,8 @@ import { TelegramCommandsBot } from './telegram-commands.bot.js';
 function context(text: string) {
   const command = text.split(' ')[0];
   return {
+    chat: { id: 123456789, type: 'private' },
+    from: { id: 123456789 },
     msg: {
       text,
       entities: [{ type: 'bot_command', offset: 0, length: command.length }],
@@ -13,10 +15,13 @@ function context(text: string) {
   };
 }
 
-function setup(targets: {
-  owners?: { ownerId: string; ownerName: string }[];
-  ibkrAccounts?: { ibkrAccountId: string; ownerName: string }[];
-}) {
+function setup(
+  targets: {
+    owners?: { ownerId: string; ownerName: string }[];
+    ibkrAccounts?: { ibkrAccountId: string; ownerName: string }[];
+  },
+  allowed = true,
+) {
   const commands = {
     findTargets: vi.fn(async (command: string) => ({
       alias: command.slice(1).split('@')[0],
@@ -41,14 +46,16 @@ function setup(targets: {
   const ibkr = {
     getAccountSnapshot: vi.fn().mockRejectedValue(new Error('IBKR is down')),
   };
+  const access = { allows: vi.fn().mockResolvedValue(allowed) };
   const api = { setMyCommands: vi.fn().mockResolvedValue(true) };
   const bot = new TelegramCommandsBot(
     { api } as never,
     commands as never,
     owners as never,
     ibkr as never,
+    access as never,
   );
-  return { bot, commands, api };
+  return { bot, commands, access, api };
 }
 
 describe('TelegramCommandsBot.handle', () => {
@@ -100,6 +107,18 @@ describe('TelegramCommandsBot.handle', () => {
 
     expect(commands.findTargets).not.toHaveBeenCalled();
     expect(ctx.reply).not.toHaveBeenCalled();
+  });
+
+  it('stays silent in a chat without access', async () => {
+    const { bot, commands, access } = setup({}, false);
+    const ctx = context('/total');
+
+    await bot.handle(ctx as never);
+
+    expect(access.allows).toHaveBeenCalledWith(ctx.chat);
+    expect(commands.findTargets).not.toHaveBeenCalled();
+    expect(ctx.reply).not.toHaveBeenCalled();
+    expect(ctx.replyWithChatAction).not.toHaveBeenCalled();
   });
 });
 
