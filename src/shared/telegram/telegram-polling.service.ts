@@ -21,14 +21,10 @@ export class TelegramPollingService
     private readonly config: ConfigType<typeof telegramConfig>,
   ) {}
 
-  // Runs after every module's onModuleInit, so all handlers are registered:
-  // grammY refuses new ones once polling has started.
   onApplicationBootstrap(): void {
     if (!this.config.polling) {
       return;
     }
-    // Not awaited: start() only resolves once polling stops.
-    // It also deletes the bot's webhook, since Telegram allows one or the other.
     this.bot
       .start({
         onStart: (me) => this.logger.log(`Polling as @${me.username}`),

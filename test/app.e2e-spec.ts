@@ -12,7 +12,6 @@ describe('AppController (e2e)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
-      // No real bot token in tests.
       .overrideProvider(Bot)
       .useValue({ isRunning: () => false })
       .compile();

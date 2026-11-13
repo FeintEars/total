@@ -20,13 +20,10 @@ export class TelegramWebhookController {
   @HttpCode(200)
   @UseGuards(TelegramWebhookGuard)
   async handleUpdate(@Body() update: Update): Promise<void> {
-    // Fetches the bot's own info once per process; no-op afterwards.
     await this.bot.init();
     try {
       await this.bot.handleUpdate(update);
     } catch (error) {
-      // Answer 200 anyway: Telegram would otherwise redeliver the same
-      // failing update over and over, holding up the ones behind it.
       this.logger.error(
         `Failed to handle update ${update.update_id}`,
         error instanceof Error ? error.stack : error,

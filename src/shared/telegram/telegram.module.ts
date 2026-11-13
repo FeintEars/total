@@ -6,8 +6,6 @@ import { TelegramWebhookController } from './telegram-webhook.controller.js';
 import { TelegramWebhookGuard } from './telegram-webhook.guard.js';
 import telegramConfig from './telegram.config.js';
 
-// Feature modules inject `Bot` to register handlers in their onModuleInit
-// and to send messages.
 @Module({
   imports: [ConfigModule.forFeature(telegramConfig)],
   controllers: [TelegramWebhookController],
