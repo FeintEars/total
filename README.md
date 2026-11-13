@@ -35,9 +35,8 @@ Flex Web Service returns a report that you define once in Client Portal. The tok
 3. Next to **Activity Flex Query**, click **+** (Create).
 4. Give it a name, e.g. `mr-total-bot`.
 5. Under **Sections**, enable:
-   - **Net Asset Value (NAV) in Base**: the total account value
-   - **Cash Report**: cash per currency
-   - **Open Positions**: optional, for a per-position breakdown
+   - **Net Asset Value (NAV) in Base**: the value of every sub-account, in its base currency
+   - **Conversion Rates**: to total the sub-accounts in USD
 6. Under **Delivery Configuration**:
    - **Format**: `XML`
    - **Period**: `Last Business Day`

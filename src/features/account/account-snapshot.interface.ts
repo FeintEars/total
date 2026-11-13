@@ -1,0 +1,23 @@
+export interface PositionSnapshot {
+  name: string;
+  quantity?: number;
+  amount: number | null;
+  currency: string;
+}
+
+export interface AccountSnapshot {
+  usdAmount: number;
+  positions: PositionSnapshot[];
+}
+
+export interface AccountSnapshotSource<TAccount extends { id: string }> {
+  readonly name: string;
+
+  accountName?(account: TAccount): string;
+
+  findByOwner(ownerId: string): Promise<TAccount[]>;
+
+  getSnapshot(account: TAccount): Promise<AccountSnapshot>;
+}
+
+export const ACCOUNT_SNAPSHOT_SOURCES = Symbol('ACCOUNT_SNAPSHOT_SOURCES');
