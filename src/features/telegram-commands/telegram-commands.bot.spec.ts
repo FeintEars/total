@@ -55,7 +55,7 @@ function setup(
     ibkr as never,
     access as never,
   );
-  return { bot, commands, access, api };
+  return { bot, commands, ibkr, access, api };
 }
 
 describe('TelegramCommandsBot.handle', () => {
@@ -75,6 +75,53 @@ describe('TelegramCommandsBot.handle', () => {
     ]);
   });
 
+  it('sends only the USD totals in one message for the balance argument', async () => {
+    const { bot, ibkr } = setup({
+      owners: [{ ownerId: 'owner-1', ownerName: 'Serhii Zubkov' }],
+      ibkrAccounts: [
+        { ibkrAccountId: 'ibkr-1', ownerName: 'Serhii Zubkov' },
+        { ibkrAccountId: 'ibkr-2', ownerName: 'John Doe' },
+      ],
+    });
+    ibkr.getAccountSnapshot.mockImplementation(async (id: string) => {
+      if (id === 'ibkr-2') {
+        throw new Error('IBKR is down');
+      }
+      return {
+        accountId: id,
+        takenAt: '2026-11-14T00:44:00.000Z',
+        totalAmount: 2825.02,
+        totalCurrency: 'USD',
+        asOf: '2026-11-12',
+        positions: [{ name: 'Cash', amount: 2825.02, currency: 'USD' }],
+      };
+    });
+    const ctx = context('/total@mr_total_bot  Balance');
+
+    await bot.handle(ctx as never);
+
+    expect(ctx.reply.mock.calls.map(([text]) => text)).toEqual([
+      [
+        '<b>Serhii Zubkov</b> — 10.00 USD',
+        '<b>IBKR · Serhii Zubkov</b> — 2,825.02 USD',
+        '⚠️ <b>IBKR · John Doe</b>: IBKR is down',
+      ].join('\n'),
+    ]);
+  });
+
+  it('shows the full report for an unknown argument', async () => {
+    const { bot } = setup({
+      owners: [{ ownerId: 'owner-1', ownerName: 'Serhii Zubkov' }],
+    });
+    const ctx = context('/total something');
+
+    await bot.handle(ctx as never);
+
+    expect(ctx.reply.mock.calls.map(([text]) => text)).toEqual([
+      '<b>Serhii Zubkov</b> — 10.00 USD\n\n<i>Nov 14, 2026, 00:44 UTC</i>',
+    ]);
+  });
+
   it('answers an unknown command with the available ones', async () => {
     const { bot } = setup({});
     const ctx = context('/nope');
@@ -82,7 +129,7 @@ describe('TelegramCommandsBot.handle', () => {
     await bot.handle(ctx as never);
 
     expect(ctx.reply).toHaveBeenCalledWith(
-      'Unknown command /nope.\n\nAvailable commands:\n/total — Serhii Zubkov',
+      'Unknown command /nope.\n\nAvailable commands:\n/total — Serhii Zubkov\n\nAdd balance for the USD total only: /total balance',
       expect.objectContaining({ parse_mode: 'HTML' }),
     );
   });
@@ -94,7 +141,7 @@ describe('TelegramCommandsBot.handle', () => {
     await bot.handle(ctx as never);
 
     expect(ctx.reply).toHaveBeenCalledWith(
-      'Available commands:\n/total — Serhii Zubkov',
+      'Available commands:\n/total — Serhii Zubkov\n\nAdd balance for the USD total only: /total balance',
       expect.anything(),
     );
   });

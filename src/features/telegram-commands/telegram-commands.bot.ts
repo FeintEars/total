@@ -9,9 +9,12 @@ import { IbkrService } from '../account/ibkr/ibkr.service.js';
 import { OwnerService } from '../owner/owner.service.js';
 import { TelegramAccessService } from '../telegram-access/telegram-access.service.js';
 import {
+  BALANCE_ARGUMENT,
   formatCommandList,
   formatFailure,
+  formatIbkrBalance,
   formatIbkrSnapshot,
+  formatOwnerBalance,
   formatOwnerSnapshot,
   formatUnknownCommand,
   splitMessage,
@@ -26,6 +29,8 @@ import {
 const HELP_ALIASES = new Set(['start', 'help']);
 const TYPING_INTERVAL_MS = 4_000;
 const MENU_MAX_COMMANDS = 100;
+
+type View = 'full' | 'balance';
 
 @Injectable()
 export class TelegramCommandsBot
@@ -74,14 +79,19 @@ export class TelegramCommandsBot
       return;
     }
 
-    const messages = await whileTyping(
+    const view = commandView(ctx, command);
+    const sections = await whileTyping(
       ctx,
       Promise.all([
-        ...targets.owners.map((target) => this.ownerMessages(target)),
-        ...targets.ibkrAccounts.map((target) => this.ibkrMessages(target)),
+        ...targets.owners.map((target) => this.ownerBlocks(target, view)),
+        ...targets.ibkrAccounts.map((target) => this.ibkrBlocks(target, view)),
       ]),
     );
-    for (const message of messages.flat()) {
+    const messages =
+      view === 'balance'
+        ? splitMessage([sections.flat().join('\n')])
+        : sections.flatMap((blocks) => splitMessage(blocks));
+    for (const message of messages) {
       await reply(ctx, message);
     }
     void this.syncMenu();
@@ -106,30 +116,29 @@ export class TelegramCommandsBot
     }
   }
 
-  private async ownerMessages({
-    ownerId,
-    ownerName,
-  }: TelegramCommandOwnerTarget): Promise<string[]> {
+  private async ownerBlocks(
+    { ownerId, ownerName }: TelegramCommandOwnerTarget,
+    view: View,
+  ): Promise<string[]> {
     try {
-      return splitMessage(
-        formatOwnerSnapshot(ownerName, await this.owners.getSnapshot(ownerId)),
-      );
+      const snapshot = await this.owners.getSnapshot(ownerId);
+      return view === 'balance'
+        ? [formatOwnerBalance(ownerName, snapshot)]
+        : formatOwnerSnapshot(ownerName, snapshot);
     } catch (error) {
       return [this.failure(ownerName, error)];
     }
   }
 
-  private async ibkrMessages({
-    ibkrAccountId,
-    ownerName,
-  }: TelegramCommandIbkrTarget): Promise<string[]> {
+  private async ibkrBlocks(
+    { ibkrAccountId, ownerName }: TelegramCommandIbkrTarget,
+    view: View,
+  ): Promise<string[]> {
     try {
-      return splitMessage(
-        formatIbkrSnapshot(
-          ownerName,
-          await this.ibkr.getAccountSnapshot(ibkrAccountId),
-        ),
-      );
+      const snapshot = await this.ibkr.getAccountSnapshot(ibkrAccountId);
+      return view === 'balance'
+        ? [formatIbkrBalance(ownerName, snapshot)]
+        : formatIbkrSnapshot(ownerName, snapshot);
     } catch (error) {
       return [this.failure(ibkrLabel(ownerName), error)];
     }
@@ -150,6 +159,15 @@ function leadingCommand(ctx: Context): string | undefined {
     ({ type, offset }) => type === 'bot_command' && offset === 0,
   );
   return text && entity ? text.slice(0, entity.length) : undefined;
+}
+
+function commandView(ctx: Context, command: string): View {
+  const argument = (ctx.msg?.text ?? '')
+    .slice(command.length)
+    .trim()
+    .split(/\s+/)[0]
+    .toLowerCase();
+  return argument === BALANCE_ARGUMENT ? 'balance' : 'full';
 }
 
 function isAddressedTo(command: string, username: string): boolean {

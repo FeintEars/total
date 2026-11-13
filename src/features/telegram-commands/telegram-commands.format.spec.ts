@@ -1,6 +1,8 @@
 import type { OwnerSnapshot } from '../owner/owner-snapshot.js';
 import {
+  formatIbkrBalance,
   formatIbkrSnapshot,
+  formatOwnerBalance,
   formatOwnerSnapshot,
   formatQuantity,
   formatUnknownCommand,
@@ -108,6 +110,35 @@ describe('formatOwnerSnapshot', () => {
   });
 });
 
+describe('formatOwnerBalance', () => {
+  it('shows only the total and names the accounts left out of it', () => {
+    expect(formatOwnerBalance('Serhii Zubkov', ownerSnapshot())).toBe(
+      '<b>Serhii Zubkov</b> — 4,464.88 USD\n⚠️ Not included: Bybit',
+    );
+  });
+
+  it('is a single line when every account answered', () => {
+    expect(
+      formatOwnerBalance('Serhii Zubkov', ownerSnapshot({ errors: [] })),
+    ).toBe('<b>Serhii Zubkov</b> — 4,464.88 USD');
+  });
+});
+
+describe('formatIbkrBalance', () => {
+  it('shows only the account total', () => {
+    expect(
+      formatIbkrBalance('Serhii Zubkov', {
+        accountId: 'ibkr-1',
+        takenAt: '2026-11-14T00:44:03.510Z',
+        totalAmount: 2825.02,
+        totalCurrency: 'USD',
+        asOf: '2026-11-12',
+        positions: SUB_ACCOUNTS,
+      }),
+    ).toBe('<b>IBKR · Serhii Zubkov</b> — 2,825.02 USD');
+  });
+});
+
 describe('formatIbkrSnapshot', () => {
   it('nests the positions under every sub-account, below the report date', () => {
     expect(
@@ -138,7 +169,7 @@ describe('formatUnknownCommand', () => {
         { alias: 'total', description: 'Serhii Zubkov' },
       ]),
     ).toBe(
-      'Unknown command /foo.\n\nAvailable commands:\n/total — Serhii Zubkov',
+      'Unknown command /foo.\n\nAvailable commands:\n/total — Serhii Zubkov\n\nAdd balance for the USD total only: /total balance',
     );
   });
 });

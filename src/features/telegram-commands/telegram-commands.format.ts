@@ -8,6 +8,7 @@ import type { TelegramCommandDescription } from './telegram-commands.service.js'
 import { ibkrLabel } from './telegram-commands.service.js';
 
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
+export const BALANCE_ARGUMENT = 'balance';
 
 const MINUS = '−';
 const NESTED_INDENT = ' '.repeat(3);
@@ -75,6 +76,25 @@ export function formatIbkrSnapshot(
   ];
 }
 
+export function formatOwnerBalance(
+  ownerName: string,
+  snapshot: OwnerSnapshot,
+): string {
+  const line = `${bold(ownerName)} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`;
+  if (snapshot.errors.length === 0) {
+    return line;
+  }
+  const missing = snapshot.errors.map(({ name }) => escape(name)).join(', ');
+  return `${line}\n⚠️ Not included: ${missing}`;
+}
+
+export function formatIbkrBalance(
+  ownerName: string,
+  snapshot: IbkrAccountSnapshot,
+): string {
+  return `${bold(ibkrLabel(ownerName))} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`;
+}
+
 export function formatCommandList(
   commands: TelegramCommandDescription[],
 ): string {
@@ -86,6 +106,8 @@ export function formatCommandList(
     ...commands.map(
       ({ alias, description }) => `/${alias} — ${escape(description)}`,
     ),
+    '',
+    `Add ${BALANCE_ARGUMENT} for the USD total only: /${commands[0].alias} ${BALANCE_ARGUMENT}`,
   ].join('\n');
 }
 
