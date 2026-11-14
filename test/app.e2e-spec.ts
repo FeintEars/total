@@ -6,7 +6,7 @@ import { App } from 'supertest/types.js';
 import { AppModule } from '../src/shared/app/app.module.js';
 import { TelegramCommandsService } from '../src/features/telegram-commands/telegram-commands.service.js';
 
-describe('AppController (e2e)', () => {
+describe('App (e2e)', () => {
   let app: INestApplication<App>;
 
   beforeEach(async () => {
@@ -30,11 +30,15 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/ (GET) is not served', () => {
+    return request(app.getHttpServer()).get('/').expect(404);
+  });
+
+  it('/telegram/webhook (POST) rejects requests without the secret', () => {
     return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+      .post('/telegram/webhook')
+      .send({ update_id: 1 })
+      .expect(403);
   });
 
   afterEach(async () => {

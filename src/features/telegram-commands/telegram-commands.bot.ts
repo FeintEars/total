@@ -94,7 +94,7 @@ export class TelegramCommandsBot
     for (const message of messages) {
       await reply(ctx, message);
     }
-    void this.syncMenu();
+    await this.syncMenu();
   }
 
   async syncMenu(): Promise<void> {
