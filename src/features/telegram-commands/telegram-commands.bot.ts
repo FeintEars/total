@@ -123,7 +123,7 @@ export class TelegramCommandsBot
     try {
       const snapshot = await this.owners.getSnapshot(ownerId);
       return view === 'balance'
-        ? [formatOwnerBalance(ownerName, snapshot)]
+        ? [formatOwnerBalance(snapshot)]
         : formatOwnerSnapshot(ownerName, snapshot);
     } catch (error) {
       return [this.failure(ownerName, error)];
@@ -137,7 +137,7 @@ export class TelegramCommandsBot
     try {
       const snapshot = await this.ibkr.getAccountSnapshot(ibkrAccountId);
       return view === 'balance'
-        ? [formatIbkrBalance(ownerName, snapshot)]
+        ? [formatIbkrBalance(snapshot)]
         : formatIbkrSnapshot(ownerName, snapshot);
     } catch (error) {
       return [this.failure(ibkrLabel(ownerName), error)];

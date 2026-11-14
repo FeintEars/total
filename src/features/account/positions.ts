@@ -40,6 +40,12 @@ export function roundPositions(
   return positions.map((position) => ({
     ...position,
     amount: position.amount === null ? null : roundMoney(position.amount),
+    ...(position.entryAmount !== undefined && {
+      entryAmount: roundMoney(position.entryAmount),
+    }),
+    ...(position.payoutAmount !== undefined && {
+      payoutAmount: roundMoney(position.payoutAmount),
+    }),
     ...(position.subpositions && {
       subpositions: position.subpositions.map((subposition) => ({
         ...subposition,

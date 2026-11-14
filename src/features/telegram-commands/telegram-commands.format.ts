@@ -1,4 +1,7 @@
-import type { PositionSnapshot } from '../account/account-snapshot.interface.js';
+import {
+  CASH_POSITION_NAME,
+  type PositionSnapshot,
+} from '../account/account-snapshot.interface.js';
 import {
   IBKR_SOURCE_NAME,
   type IbkrAccountSnapshot,
@@ -11,7 +14,21 @@ export const TELEGRAM_MESSAGE_LIMIT = 4096;
 export const BALANCE_ARGUMENT = 'balance';
 
 const MINUS = '−';
-const NESTED_INDENT = ' '.repeat(3);
+const RULE = '━'.repeat(18);
+const QUOTE_OPEN = '<blockquote expandable>';
+const QUOTE_CLOSE = '</blockquote>';
+const GROUP_MARKER = '▸ ';
+const BRANCH = '├ ';
+const LAST_BRANCH = '└ ';
+const DEFAULT_SOURCE_ICON = '📁';
+const SOURCE_ICONS: Record<string, string> = {
+  [IBKR_SOURCE_NAME]: '🏦',
+  Binance: '🟡',
+  Bybit: '⚫',
+  Polymarket: '🎯',
+  Earns: '🌱',
+};
+const NESTED_INDENT = '\u00a0'.repeat(4);
 const QUANTITY_SIGNIFICANT_DIGITS = 5;
 const QUANTITY_MAX_FRACTION_DIGITS = 10;
 
@@ -31,7 +48,9 @@ export function formatOwnerSnapshot(
   snapshot: OwnerSnapshot,
 ): string[] {
   const header = [
-    `${bold(ownerName)} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`,
+    `💼 ${bold(ownerName)}`,
+    RULE,
+    `💰 <b>${money(snapshot.totalAmount, snapshot.totalCurrency)}</b>`,
   ];
   const invested = snapshot.inputs.reduce(
     (total, { amount }) => total + amount,
@@ -40,7 +59,8 @@ export function formatOwnerSnapshot(
   if (invested > 0) {
     const pnl = snapshot.totalAmount - invested;
     header.push(
-      `Invested ${money(invested, 'USD')} · P&amp;L ${money(pnl, 'USD', true)} (${signed(
+      `📥 Invested ${money(invested, 'USD')}`,
+      `${pnlIcon(pnl)} P&amp;L ${money(pnl, 'USD', true)} (${signed(
         (pnl / invested) * 100,
       )}%)`,
     );
@@ -58,7 +78,7 @@ export function formatOwnerSnapshot(
     );
   }
   blocks.push(
-    italic(`${dateTimeFormat.format(new Date(snapshot.takenAt))} UTC`),
+    `🕐 ${italic(`${dateTimeFormat.format(new Date(snapshot.takenAt))} UTC`)}`,
   );
   return blocks;
 }
@@ -68,19 +88,18 @@ export function formatIbkrSnapshot(
   snapshot: IbkrAccountSnapshot,
 ): string[] {
   return [
-    formatSection(
-      `${bold(ibkrLabel(ownerName))} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`,
-      snapshot.asOf,
-      snapshot.positions,
-    ),
+    [
+      `${sourceIcon(IBKR_SOURCE_NAME)} ${bold(ibkrLabel(ownerName))}`,
+      RULE,
+      `💰 <b>${money(snapshot.totalAmount, snapshot.totalCurrency)}</b>`,
+      `📅 ${italic(`As of ${reportDate(snapshot.asOf)} close`)}`,
+    ].join('\n'),
+    ...snapshot.positions.map(formatIbkrSubAccount),
   ];
 }
 
-export function formatOwnerBalance(
-  ownerName: string,
-  snapshot: OwnerSnapshot,
-): string {
-  const line = `${bold(ownerName)} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`;
+export function formatOwnerBalance(snapshot: OwnerSnapshot): string {
+  const line = money(snapshot.totalAmount, snapshot.totalCurrency);
   if (snapshot.errors.length === 0) {
     return line;
   }
@@ -88,11 +107,8 @@ export function formatOwnerBalance(
   return `${line}\n⚠️ Not included: ${missing}`;
 }
 
-export function formatIbkrBalance(
-  ownerName: string,
-  snapshot: IbkrAccountSnapshot,
-): string {
-  return `${bold(ibkrLabel(ownerName))} — ${money(snapshot.totalAmount, snapshot.totalCurrency)}`;
+export function formatIbkrBalance(snapshot: IbkrAccountSnapshot): string {
+  return money(snapshot.totalAmount, snapshot.totalCurrency);
 }
 
 export function formatCommandList(
@@ -147,8 +163,8 @@ export function splitMessage(
 function formatOutput(output: OutputSnapshot): string[] {
   return [
     formatSection(
-      `${bold(output.name)} — ${money(output.amount, output.currency)}`,
-      output.name === IBKR_SOURCE_NAME ? output.asOf : undefined,
+      `${sourceIcon(output.source)} ${bold(output.name)} — ${money(output.amount, output.currency)}`,
+      output.source === IBKR_SOURCE_NAME ? output.asOf : undefined,
       output.positions,
     ),
   ];
@@ -159,22 +175,70 @@ function formatSection(
   reportAsOf: string | undefined,
   positions: PositionSnapshot[],
 ): string {
-  return [
+  const grouped = positions.some(({ subpositions }) => subpositions?.length);
+  const marker = grouped ? GROUP_MARKER : '';
+  const entries = positions.map((position) =>
+    isOutcome(position)
+      ? [
+          `${marker}${escape(position.name)}`,
+          `${NESTED_INDENT}${outcomeAmounts(position)}`,
+        ]
+      : [
+          `${marker}${positionText(position)}`,
+          ...(position.subpositions ?? []).map(
+            (subposition) => `${NESTED_INDENT}${positionText(subposition)}`,
+          ),
+        ],
+  );
+  const separator = grouped || positions.some(isOutcome) ? '\n\n' : '\n';
+  const lines = [
     header,
     ...(reportAsOf ? [italic(`As of ${reportDate(reportAsOf)} close`)] : []),
-    ...positions.flatMap((position) => [
-      formatPosition(position),
-      ...(position.subpositions ?? []).map(formatNestedPosition),
-    ]),
+  ];
+  if (entries.length > 0) {
+    lines.push(
+      `${QUOTE_OPEN}${entries.map((entry) => entry.join('\n')).join(separator)}${QUOTE_CLOSE}`,
+    );
+  }
+  return lines.join('\n');
+}
+
+function formatIbkrSubAccount(subAccount: PositionSnapshot): string {
+  const holdings = subAccount.subpositions ?? [];
+  return [
+    `📂 ${bold(subAccount.name)} — ${amount(subAccount)}`,
+    ...holdings.map(
+      (holding, index) =>
+        `${index === holdings.length - 1 ? LAST_BRANCH : BRANCH}${positionText(holding)}`,
+    ),
   ].join('\n');
 }
 
-function formatPosition(position: PositionSnapshot): string {
-  return `• ${positionText(position)}`;
+function isOutcome(position: PositionSnapshot): position is PositionSnapshot & {
+  entryAmount: number;
+  payoutAmount: number;
+} {
+  return (
+    position.entryAmount !== undefined && position.payoutAmount !== undefined
+  );
 }
 
-function formatNestedPosition(position: PositionSnapshot): string {
-  return `${NESTED_INDENT}◦ ${positionText(position)}`;
+function outcomeAmounts(
+  position: PositionSnapshot & { entryAmount: number; payoutAmount: number },
+): string {
+  const { entryAmount, payoutAmount, currency } = position;
+  return `Entry ${money(entryAmount, currency)} · Now ${amount(position)} · Win ${money(payoutAmount, currency)}`;
+}
+
+function sourceIcon(source: string): string {
+  return SOURCE_ICONS[source] ?? DEFAULT_SOURCE_ICON;
+}
+
+function pnlIcon(pnl: number): string {
+  if (Math.round(pnl * 100) === 0) {
+    return '⚪';
+  }
+  return pnl > 0 ? '🟢' : '🔴';
 }
 
 function positionText(position: PositionSnapshot): string {
@@ -182,7 +246,12 @@ function positionText(position: PositionSnapshot): string {
     position.quantity === undefined
       ? ''
       : ` ×${formatQuantity(position.quantity)}`;
-  return `${escape(position.name)}${quantity} — ${amount(position)}`;
+  const icon = isCash(position) ? '💵 ' : '';
+  return `${icon}${escape(position.name)}${quantity} — ${amount(position)}`;
+}
+
+function isCash({ name, quantity }: PositionSnapshot): boolean {
+  return name === CASH_POSITION_NAME && quantity === undefined;
 }
 
 function amount({ amount, currency }: PositionSnapshot): string {
@@ -190,6 +259,10 @@ function amount({ amount, currency }: PositionSnapshot): string {
 }
 
 function money(value: number, currency: string, showPlus = false): string {
+  return `${decimal(value, showPlus)} ${escape(currency)}`;
+}
+
+function decimal(value: number, showPlus = false): string {
   const formatted = Math.abs(value).toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -200,7 +273,7 @@ function money(value: number, currency: string, showPlus = false): string {
       : showPlus && value > 0
         ? '+'
         : '';
-  return `${sign}${formatted} ${escape(currency)}`;
+  return `${sign}${formatted}`;
 }
 
 function signed(value: number): string {
@@ -233,12 +306,16 @@ function splitBlock(block: string, limit: number): string[] {
   if (block.length <= limit) {
     return [block];
   }
+  const budget = block.includes(QUOTE_OPEN)
+    ? limit - QUOTE_OPEN.length - QUOTE_CLOSE.length
+    : limit;
   const parts: string[] = [];
   let current = '';
   for (const line of block.split('\n')) {
-    const fitted = line.length > limit ? `${line.slice(0, limit - 1)}…` : line;
+    const fitted =
+      line.length > budget ? `${line.slice(0, budget - 1)}…` : line;
     const joined = current ? `${current}\n${fitted}` : fitted;
-    if (joined.length > limit && current) {
+    if (joined.length > budget && current) {
       parts.push(current);
       current = fitted;
     } else {
@@ -248,7 +325,16 @@ function splitBlock(block: string, limit: number): string[] {
   if (current) {
     parts.push(current);
   }
-  return parts;
+  return balanceQuotes(parts);
+}
+
+function balanceQuotes(parts: string[]): string[] {
+  let carried = false;
+  return parts.map((part) => {
+    const text = carried ? `${QUOTE_OPEN}${part}` : part;
+    carried = text.lastIndexOf(QUOTE_OPEN) > text.lastIndexOf(QUOTE_CLOSE);
+    return carried ? `${text}${QUOTE_CLOSE}` : text;
+  });
 }
 
 function bold(text: string): string {

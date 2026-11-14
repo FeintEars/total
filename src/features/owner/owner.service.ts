@@ -58,6 +58,7 @@ export class OwnerService {
         const { usdAmount, positions, asOf } = result.value;
         outputs.push({
           id: account.id,
+          source: source.name,
           name,
           amount: roundMoney(usdAmount),
           currency: 'USD',

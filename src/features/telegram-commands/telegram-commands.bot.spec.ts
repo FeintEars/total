@@ -70,7 +70,7 @@ describe('TelegramCommandsBot.handle', () => {
 
     expect(ctx.replyWithChatAction).toHaveBeenCalledWith('typing');
     expect(ctx.reply.mock.calls.map(([text]) => text)).toEqual([
-      '<b>Serhii Zubkov</b> — 10.00 USD\n\n<i>Nov 14, 2026, 00:44 UTC</i>',
+      '💼 <b>Serhii Zubkov</b>\n━━━━━━━━━━━━━━━━━━\n💰 <b>10.00 USD</b>\n\n🕐 <i>Nov 14, 2026, 00:44 UTC</i>',
       '⚠️ <b>IBKR · Serhii Zubkov</b>: IBKR is down',
     ]);
   });
@@ -102,8 +102,8 @@ describe('TelegramCommandsBot.handle', () => {
 
     expect(ctx.reply.mock.calls.map(([text]) => text)).toEqual([
       [
-        '<b>Serhii Zubkov</b> — 10.00 USD',
-        '<b>IBKR · Serhii Zubkov</b> — 2,825.02 USD',
+        '10.00 USD',
+        '2,825.02 USD',
         '⚠️ <b>IBKR · John Doe</b>: IBKR is down',
       ].join('\n'),
     ]);
@@ -118,7 +118,7 @@ describe('TelegramCommandsBot.handle', () => {
     await bot.handle(ctx as never);
 
     expect(ctx.reply.mock.calls.map(([text]) => text)).toEqual([
-      '<b>Serhii Zubkov</b> — 10.00 USD\n\n<i>Nov 14, 2026, 00:44 UTC</i>',
+      '💼 <b>Serhii Zubkov</b>\n━━━━━━━━━━━━━━━━━━\n💰 <b>10.00 USD</b>\n\n🕐 <i>Nov 14, 2026, 00:44 UTC</i>',
     ]);
   });
 

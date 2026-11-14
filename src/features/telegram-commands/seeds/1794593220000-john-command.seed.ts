@@ -10,7 +10,7 @@ export default {
       .into(TelegramCommandOwner)
       .values({
         id: '00000000-0000-4000-8000-000000000401',
-        alias: 'total',
+        alias: 'john',
         ownerId: JOHN_DOE_ID,
       })
       .orIgnore()

@@ -191,9 +191,9 @@ This is the proxy wallet address. It is **not** the same as the address of the w
 
 ### How it is read
 
-- `GET https://data-api.polymarket.com/value?user={address}`: current value of open positions, in USD
-- `GET https://data-api.polymarket.com/positions?user={address}`: list of open positions
-- Cash: call `balanceOf(address)` on the USDC.e contract on Polygon (`0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`, 6 decimals) through any Polygon RPC endpoint
+- `GET https://data-api.polymarket.com/v2/value?user={address}`: current value of open positions, in USD
+- `GET https://data-api.polymarket.com/v2/positions?user={address}`: list of open positions. For each one the report shows what was paid to enter (`entry_cost_usdc`, without fees), what it is worth now (`current_value`), and what it pays out if the outcome wins (`current_size` × 1 USD, since every winning share redeems for 1 USD). Positions worth nothing are left out.
+- Cash: call `balanceOf(address)` on the USDC.e (`0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174`) and pUSD (`0xC011a7E12a19f7B1f670d46F03B03f3342E82DFB`) contracts on Polygon (6 decimals) through any Polygon RPC endpoint. Both are shown together as one **Cash** line.
 
 ---
 

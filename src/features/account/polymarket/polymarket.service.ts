@@ -3,10 +3,11 @@ import type { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { fetchJson } from '../../../shared/http/http.js';
-import type {
-  AccountSnapshot,
-  AccountSnapshotSource,
-  PositionSnapshot,
+import {
+  CASH_POSITION_NAME,
+  type AccountSnapshot,
+  type AccountSnapshotSource,
+  type PositionSnapshot,
 } from '../account-snapshot.interface.js';
 import { byAmountDesc, sumAmounts, todayAsOf } from '../positions.js';
 import { PolymarketAccount } from './polymarket-account.entity.js';
@@ -22,6 +23,7 @@ const COLLATERAL_TOKENS = [
 ] as const;
 const COLLATERAL_DECIMALS = 6;
 const BALANCE_OF_SELECTOR = '0x70a08231';
+const WINNING_SHARE_PAYOUT_USD = 1;
 
 interface PositionsPage {
   data: {
@@ -29,6 +31,7 @@ interface PositionsPage {
     outcome: string;
     current_size: number;
     current_value: number;
+    entry_cost_usdc: number;
   }[];
   pagination: { next_cursor: string | null };
 }
@@ -60,19 +63,16 @@ export class PolymarketService implements AccountSnapshotSource<PolymarketAccoun
       ),
       this.positions(user),
       Promise.all(
-        COLLATERAL_TOKENS.map(async (token) => {
-          const quantity = await this.tokenBalance(token.address, user);
-          return {
-            name: token.name,
-            quantity,
-            amount: quantity,
-            currency: 'USD',
-          };
-        }),
-      ),
+        COLLATERAL_TOKENS.map((token) =>
+          this.tokenBalance(token.address, user),
+        ),
+      ).then((balances) => balances.reduce((total, b) => total + b, 0)),
     ]);
 
-    const cashPositions = cash.filter(({ quantity }) => quantity > 0);
+    const cashPositions: PositionSnapshot[] =
+      cash > 0
+        ? [{ name: CASH_POSITION_NAME, amount: cash, currency: 'USD' }]
+        : [];
     return {
       usdAmount: value.data.value + sumAmounts(cashPositions),
       positions: [...positions.sort(byAmountDesc), ...cashPositions],
@@ -98,9 +98,10 @@ export class PolymarketService implements AccountSnapshotSource<PolymarketAccoun
           .filter((p) => p.current_value > 0)
           .map((p) => ({
             name: `${p.title} — ${p.outcome}`,
-            quantity: p.current_size,
             amount: p.current_value,
             currency: 'USD',
+            entryAmount: p.entry_cost_usdc,
+            payoutAmount: p.current_size * WINNING_SHARE_PAYOUT_USD,
           })),
       );
       cursor = pagination.next_cursor;

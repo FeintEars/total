@@ -9,6 +9,7 @@ export interface InputSnapshot {
 
 export interface OutputSnapshot {
   id: string;
+  source: string;
   name: string;
   amount: number;
   currency: 'USD';

@@ -1,8 +1,9 @@
 import { toNumber } from '../../../shared/http/http.js';
-import type {
-  AccountSnapshot,
-  PositionSnapshot,
-  SubpositionSnapshot,
+import {
+  CASH_POSITION_NAME,
+  type AccountSnapshot,
+  type PositionSnapshot,
+  type SubpositionSnapshot,
 } from '../account-snapshot.interface.js';
 import { roundMoney, todayAsOf } from '../positions.js';
 
@@ -225,7 +226,7 @@ function parseCash(
       ? byCurrency
       : [{ ...summary, currency: baseCurrency }];
   return cash.map(({ currency, endingCash }) => ({
-    name: 'Cash',
+    name: CASH_POSITION_NAME,
     amount: toNumber(endingCash),
     currency,
   }));

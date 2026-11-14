@@ -67,6 +67,7 @@ describe('OwnerService.getSnapshot', () => {
     expect(snapshot.outputs).toEqual([
       {
         id: 'ibkr-1',
+        source: 'IBKR',
         name: 'IBKR',
         amount: 100,
         currency: 'USD',
@@ -76,6 +77,7 @@ describe('OwnerService.getSnapshot', () => {
       expect.objectContaining({ id: 'ibkr-2', name: 'IBKR', amount: 200 }),
       expect.objectContaining({
         id: 'earns-1',
+        source: 'Earns',
         name: 'Telegram Wallet',
         amount: 5,
         currency: 'USD',

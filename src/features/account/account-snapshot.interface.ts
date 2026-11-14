@@ -1,3 +1,5 @@
+export const CASH_POSITION_NAME = 'Cash';
+
 export interface SubpositionSnapshot {
   name: string;
   quantity?: number;
@@ -10,6 +12,8 @@ export interface PositionSnapshot {
   quantity?: number;
   amount: number | null;
   currency: string;
+  entryAmount?: number;
+  payoutAmount?: number;
   subpositions?: SubpositionSnapshot[];
 }
 

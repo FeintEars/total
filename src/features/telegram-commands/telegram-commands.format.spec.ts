@@ -38,6 +38,7 @@ function ownerSnapshot(overrides: Partial<OwnerSnapshot> = {}): OwnerSnapshot {
     outputs: [
       {
         id: 'ibkr-1',
+        source: 'IBKR',
         name: 'IBKR',
         amount: 2825.02,
         currency: 'USD',
@@ -49,6 +50,7 @@ function ownerSnapshot(overrides: Partial<OwnerSnapshot> = {}): OwnerSnapshot {
       },
       {
         id: 'binance-1',
+        source: 'Binance',
         name: 'Binance',
         amount: 30.72,
         currency: 'USD',
@@ -63,6 +65,15 @@ function ownerSnapshot(overrides: Partial<OwnerSnapshot> = {}): OwnerSnapshot {
           { name: 'PAXG', quantity: 0.00001839, amount: 0.07, currency: 'USD' },
         ],
       },
+      {
+        id: 'earns-1',
+        source: 'Earns',
+        name: 'Telegram Wallet',
+        amount: 0,
+        currency: 'USD',
+        asOf: '2026-11-14',
+        positions: [],
+      },
     ],
     errors: [{ id: 'bybit-1', name: 'Bybit', message: 'Invalid <API> key' }],
     ...overrides,
@@ -72,12 +83,37 @@ function ownerSnapshot(overrides: Partial<OwnerSnapshot> = {}): OwnerSnapshot {
 describe('formatOwnerSnapshot', () => {
   it('shows the total, P&L, every account and errors', () => {
     expect(formatOwnerSnapshot('Serhii Zubkov', ownerSnapshot())).toEqual([
-      '<b>Serhii Zubkov</b> — 4,464.88 USD\nInvested 5,925.50 USD · P&amp;L −1,460.62 USD (−24.65%)',
-      '<b>IBKR</b> — 2,825.02 USD\n<i>As of Nov 12, 2026 close</i>\n• Innovations — 952.37 USD\n• PLN Allocation — 960.07 PLN',
-      '<b>Binance</b> — 30.72 USD\n• HBAR ×500.06 — 30.65 USD\n• PAXG ×0.00001839 — 0.07 USD',
+      [
+        '💼 <b>Serhii Zubkov</b>',
+        '━━━━━━━━━━━━━━━━━━',
+        '💰 <b>4,464.88 USD</b>',
+        '📥 Invested 5,925.50 USD',
+        '🔴 P&amp;L −1,460.62 USD (−24.65%)',
+      ].join('\n'),
+      [
+        '🏦 <b>IBKR</b> — 2,825.02 USD',
+        '<i>As of Nov 12, 2026 close</i>',
+        '<blockquote expandable>Innovations — 952.37 USD',
+        'PLN Allocation — 960.07 PLN</blockquote>',
+      ].join('\n'),
+      [
+        '🟡 <b>Binance</b> — 30.72 USD',
+        '<blockquote expandable>HBAR ×500.06 — 30.65 USD',
+        'PAXG ×0.00001839 — 0.07 USD</blockquote>',
+      ].join('\n'),
+      '🌱 <b>Telegram Wallet</b> — 0.00 USD',
       '⚠️ Bybit: Invalid &lt;API&gt; key',
-      '<i>Nov 14, 2026, 00:44 UTC</i>',
+      '🕐 <i>Nov 14, 2026, 00:44 UTC</i>',
     ]);
+  });
+
+  it('marks a P&L in profit green', () => {
+    const [header] = formatOwnerSnapshot(
+      'Serhii Zubkov',
+      ownerSnapshot({ totalAmount: 6000 }),
+    );
+
+    expect(header.split('\n').at(-1)).toBe('🟢 P&amp;L +74.50 USD (+1.26%)');
   });
 
   it('nests the positions of every sub-account inside the IBKR section for the full view', () => {
@@ -87,47 +123,97 @@ describe('formatOwnerSnapshot', () => {
       outputs: [
         {
           id: 'ibkr-1',
+          source: 'IBKR',
           name: 'IBKR',
           amount: 952.37,
           currency: 'USD',
           asOf: '2026-11-12',
-          positions: SUB_ACCOUNTS,
+          positions: [
+            ...SUB_ACCOUNTS,
+            {
+              name: 'PLN Allocation',
+              amount: 960.07,
+              currency: 'PLN',
+              subpositions: [],
+            },
+          ],
         },
       ],
     });
 
     expect(formatOwnerSnapshot('John Doe', snapshot)).toEqual([
-      '<b>John Doe</b> — 4,464.88 USD',
+      '💼 <b>John Doe</b>\n━━━━━━━━━━━━━━━━━━\n💰 <b>4,464.88 USD</b>',
       [
-        '<b>IBKR</b> — 952.37 USD',
+        '🏦 <b>IBKR</b> — 952.37 USD',
         '<i>As of Nov 12, 2026 close</i>',
-        '• Innovations — 952.37 USD',
-        '\u00a0\u00a0\u00a0◦ GOOG ×1.1 — 324.89 USD',
-        '\u00a0\u00a0\u00a0◦ Cash — 85.03 EUR',
+        '<blockquote expandable>▸ Innovations — 952.37 USD',
+        '\u00a0\u00a0\u00a0\u00a0GOOG ×1.1 — 324.89 USD',
+        '\u00a0\u00a0\u00a0\u00a0💵 Cash — 85.03 EUR',
+        '',
+        '▸ PLN Allocation — 960.07 PLN</blockquote>',
       ].join('\n'),
-      '<i>Nov 14, 2026, 00:44 UTC</i>',
+      '🕐 <i>Nov 14, 2026, 00:44 UTC</i>',
     ]);
+  });
+});
+
+describe('formatOwnerSnapshot for Polymarket', () => {
+  it('shows entry, current and winning amounts per outcome, then cash', () => {
+    const snapshot = ownerSnapshot({
+      inputs: [],
+      errors: [],
+      outputs: [
+        {
+          id: 'polymarket-1',
+          source: 'Polymarket',
+          name: 'Polymarket',
+          amount: 161.5,
+          currency: 'USD',
+          asOf: '2026-11-14',
+          positions: [
+            {
+              name: 'Will <X> happen? — Yes',
+              amount: 61.5,
+              currency: 'USD',
+              entryAmount: 52.71,
+              payoutAmount: 125.5,
+            },
+            { name: 'Cash', amount: 100, currency: 'USD' },
+          ],
+        },
+      ],
+    });
+
+    expect(formatOwnerSnapshot('John Doe', snapshot)[1]).toBe(
+      [
+        '🎯 <b>Polymarket</b> — 161.50 USD',
+        '<blockquote expandable>Will &lt;X&gt; happen? — Yes',
+        '\u00a0\u00a0\u00a0\u00a0Entry 52.71 USD · Now 61.50 USD · Win 125.50 USD',
+        '',
+        '💵 Cash — 100.00 USD</blockquote>',
+      ].join('\n'),
+    );
   });
 });
 
 describe('formatOwnerBalance', () => {
   it('shows only the total and names the accounts left out of it', () => {
-    expect(formatOwnerBalance('Serhii Zubkov', ownerSnapshot())).toBe(
-      '<b>Serhii Zubkov</b> — 4,464.88 USD\n⚠️ Not included: Bybit',
+    expect(formatOwnerBalance(ownerSnapshot())).toBe(
+      '4,464.88 USD\n⚠️ Not included: Bybit',
     );
   });
 
   it('is a single line when every account answered', () => {
-    expect(
-      formatOwnerBalance('Serhii Zubkov', ownerSnapshot({ errors: [] })),
-    ).toBe('<b>Serhii Zubkov</b> — 4,464.88 USD');
+    expect(formatOwnerBalance(ownerSnapshot({ errors: [] }))).toBe(
+      '4,464.88 USD',
+    );
   });
 });
 
 describe('formatIbkrBalance', () => {
   it('shows only the account total', () => {
     expect(
-      formatIbkrBalance('Serhii Zubkov', {
+      formatIbkrBalance({
         accountId: 'ibkr-1',
         takenAt: '2026-11-14T00:44:03.510Z',
         totalAmount: 2825.02,
@@ -135,12 +221,12 @@ describe('formatIbkrBalance', () => {
         asOf: '2026-11-12',
         positions: SUB_ACCOUNTS,
       }),
-    ).toBe('<b>IBKR · Serhii Zubkov</b> — 2,825.02 USD');
+    ).toBe('2,825.02 USD');
   });
 });
 
 describe('formatIbkrSnapshot', () => {
-  it('nests the positions under every sub-account, below the report date', () => {
+  it('shows a header, then every sub-account as its own tree', () => {
     expect(
       formatIbkrSnapshot('Serhii Zubkov', {
         accountId: 'ibkr-1',
@@ -148,16 +234,38 @@ describe('formatIbkrSnapshot', () => {
         totalAmount: 2825.02,
         totalCurrency: 'USD',
         asOf: '2026-11-12',
-        positions: SUB_ACCOUNTS,
+        positions: [
+          ...SUB_ACCOUNTS,
+          {
+            name: 'PLN Allocation',
+            amount: 960.07,
+            currency: 'PLN',
+            subpositions: [
+              { name: 'CDR', quantity: 2, amount: 644.74, currency: 'PLN' },
+              { name: 'Cash', amount: 315.33, currency: 'PLN' },
+            ],
+          },
+          { name: 'Empty', amount: 0, currency: 'USD', subpositions: [] },
+        ],
       }),
     ).toEqual([
       [
-        '<b>IBKR · Serhii Zubkov</b> — 2,825.02 USD',
-        '<i>As of Nov 12, 2026 close</i>',
-        '• Innovations — 952.37 USD',
-        '\u00a0\u00a0\u00a0◦ GOOG ×1.1 — 324.89 USD',
-        '\u00a0\u00a0\u00a0◦ Cash — 85.03 EUR',
+        '🏦 <b>IBKR · Serhii Zubkov</b>',
+        '━━━━━━━━━━━━━━━━━━',
+        '💰 <b>2,825.02 USD</b>',
+        '📅 <i>As of Nov 12, 2026 close</i>',
       ].join('\n'),
+      [
+        '📂 <b>Innovations</b> — 952.37 USD',
+        '├ GOOG ×1.1 — 324.89 USD',
+        '└ 💵 Cash — 85.03 EUR',
+      ].join('\n'),
+      [
+        '📂 <b>PLN Allocation</b> — 960.07 PLN',
+        '├ CDR ×2 — 644.74 PLN',
+        '└ 💵 Cash — 315.33 PLN',
+      ].join('\n'),
+      '📂 <b>Empty</b> — 0.00 USD',
     ]);
   });
 });
@@ -193,5 +301,18 @@ describe('splitMessage', () => {
 
   it('splits a block that alone exceeds the limit by lines', () => {
     expect(splitMessage(['111\n222\n333'], 7)).toEqual(['111\n222', '333']);
+  });
+
+  it('closes and reopens a collapsed quote that is split across messages', () => {
+    const [a, b, c] = ['a', 'b', 'c'].map((letter) => letter.repeat(30));
+    const quote = (text: string) =>
+      `<blockquote expandable>${text}</blockquote>`;
+
+    expect(
+      splitMessage(
+        [`Header\n<blockquote expandable>${a}\n${b}\n${c}</blockquote>`],
+        100,
+      ),
+    ).toEqual([`Header\n${quote(a)}`, quote(b), quote(c)]);
   });
 });
