@@ -25,10 +25,9 @@ Add `balance` after any command, as in `/john balance` or `/ibkr balance`, to ge
 
 Who may use the bot is set up in the database, not in code:
 
-| Table              | One row allows                                                    |
-| ------------------ | ----------------------------------------------------------------- |
-| `tg_allowed_users` | One user (`user_id`) to use the bot in a private chat.            |
-| `tg_allowed_chats` | One group or supergroup (`chat_id`). Any member may run commands. |
+| Table              | One row allows                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tg_allowed_chats` | One chat (`chat_id`): a user's private chat with the bot (the user's id), or a group or supergroup. Any member of an allowed group may run commands. |
 
 To find an id, send any command to the bot from that chat. The bot logs it as `Ignored /total in private chat 123456789 from user 123456789`. Then add a row.
 
