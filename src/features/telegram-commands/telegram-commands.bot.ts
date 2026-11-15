@@ -17,6 +17,7 @@ import {
   formatOwnerBalance,
   formatOwnerSnapshot,
   formatUnknownCommand,
+  MESSAGE_OPTIONS,
   splitMessage,
 } from './telegram-commands.format.js';
 import {
@@ -24,6 +25,7 @@ import {
   TelegramCommandsService,
   type TelegramCommandIbkrTarget,
   type TelegramCommandOwnerTarget,
+  type TelegramCommandTargets,
 } from './telegram-commands.service.js';
 
 const HELP_ALIASES = new Set(['start', 'help']);
@@ -68,7 +70,7 @@ export class TelegramCommandsBot
     }
 
     const targets = await this.commands.findTargets(command);
-    if (targets.owners.length === 0 && targets.ibkrAccounts.length === 0) {
+    if (!hasTargets(targets)) {
       const available = await this.commands.listCommands();
       await reply(
         ctx,
@@ -79,22 +81,23 @@ export class TelegramCommandsBot
       return;
     }
 
-    const view = commandView(ctx, command);
-    const sections = await whileTyping(
+    const messages = await whileTyping(
       ctx,
-      Promise.all([
-        ...targets.owners.map((target) => this.ownerBlocks(target, view)),
-        ...targets.ibkrAccounts.map((target) => this.ibkrBlocks(target, view)),
-      ]),
+      this.messages(targets, commandView(ctx.msg?.text ?? '', command)),
     );
-    const messages =
-      view === 'balance'
-        ? splitMessage([sections.flat().join('\n')])
-        : sections.flatMap((blocks) => splitMessage(blocks));
     for (const message of messages) {
       await reply(ctx, message);
     }
     await this.syncMenu();
+  }
+
+  async report(text: string): Promise<string[] | undefined> {
+    const input = text.trim();
+    const command = input.split(/\s+/)[0];
+    const targets = await this.commands.findTargets(command);
+    return hasTargets(targets)
+      ? this.messages(targets, commandView(input, command))
+      : undefined;
   }
 
   async syncMenu(): Promise<void> {
@@ -114,6 +117,19 @@ export class TelegramCommandsBot
         error instanceof Error ? error.stack : error,
       );
     }
+  }
+
+  private async messages(
+    targets: TelegramCommandTargets,
+    view: View,
+  ): Promise<string[]> {
+    const sections = await Promise.all([
+      ...targets.owners.map((target) => this.ownerBlocks(target, view)),
+      ...targets.ibkrAccounts.map((target) => this.ibkrBlocks(target, view)),
+    ]);
+    return view === 'balance'
+      ? splitMessage([sections.flat().join('\n')])
+      : sections.flatMap((blocks) => splitMessage(blocks));
   }
 
   private async ownerBlocks(
@@ -161,8 +177,12 @@ function leadingCommand(ctx: Context): string | undefined {
   return text && entity ? text.slice(0, entity.length) : undefined;
 }
 
-function commandView(ctx: Context, command: string): View {
-  const argument = (ctx.msg?.text ?? '')
+function hasTargets(targets: TelegramCommandTargets): boolean {
+  return targets.owners.length > 0 || targets.ibkrAccounts.length > 0;
+}
+
+function commandView(text: string, command: string): View {
+  const argument = text
     .slice(command.length)
     .trim()
     .split(/\s+/)[0]
@@ -176,10 +196,7 @@ function isAddressedTo(command: string, username: string): boolean {
 }
 
 async function reply(ctx: Context, text: string): Promise<void> {
-  await ctx.reply(text, {
-    parse_mode: 'HTML',
-    link_preview_options: { is_disabled: true },
-  });
+  await ctx.reply(text, MESSAGE_OPTIONS);
 }
 
 async function whileTyping<T>(ctx: Context, work: Promise<T>): Promise<T> {

@@ -169,6 +169,35 @@ describe('TelegramCommandsBot.handle', () => {
   });
 });
 
+describe('TelegramCommandsBot.report', () => {
+  it('builds the messages of a command without a chat', async () => {
+    const { bot, commands } = setup({
+      owners: [{ ownerId: 'owner-1', ownerName: 'Serhii Zubkov' }],
+    });
+
+    await expect(bot.report('  /total Balance ')).resolves.toEqual([
+      '10.00 USD',
+    ]);
+    expect(commands.findTargets).toHaveBeenCalledWith('/total');
+  });
+
+  it('accepts a command without the slash and shows the full report', async () => {
+    const { bot } = setup({
+      owners: [{ ownerId: 'owner-1', ownerName: 'Serhii Zubkov' }],
+    });
+
+    await expect(bot.report('total')).resolves.toEqual([
+      '💼 <b>Serhii Zubkov</b>\n━━━━━━━━━━━━━━━━━━\n💰 <b>10.00 USD</b>\n\n🕐 <i>Nov 14, 2026, 00:44 UTC</i>',
+    ]);
+  });
+
+  it('returns nothing for an unknown command', async () => {
+    const { bot } = setup({});
+
+    await expect(bot.report('/nope')).resolves.toBeUndefined();
+  });
+});
+
 describe('TelegramCommandsBot.syncMenu', () => {
   it('publishes the menu only when the commands change', async () => {
     const { bot, commands, api } = setup({});

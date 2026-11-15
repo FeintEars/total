@@ -7,6 +7,7 @@ import { OwnerModule } from '../../features/owner/owner.module.js';
 import { AccountModule } from '../../features/account/account.module.js';
 import { InputsModule } from '../../features/inputs/inputs.module.js';
 import { TelegramCommandsModule } from '../../features/telegram-commands/telegram-commands.module.js';
+import { TelegramSubscriptionsModule } from '../../features/telegram-subscriptions/telegram-subscriptions.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -24,6 +25,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     AccountModule,
     InputsModule,
     TelegramCommandsModule,
+    TelegramSubscriptionsModule,
   ],
 })
 export class AppModule {}

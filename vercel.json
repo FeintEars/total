@@ -1,5 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nestjs",
-  "regions": ["fra1"]
+  "buildCommand": "npm run build && npm run migration:deploy",
+  "regions": ["fra1"],
+  "schedules": {
+    "telegram-subscriptions": {
+      "schedule": "0 6 * * *",
+      "path": "/telegram/subscriptions/send",
+      "requestMethod": "POST"
+    }
+  }
 }

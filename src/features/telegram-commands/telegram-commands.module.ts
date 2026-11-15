@@ -21,6 +21,6 @@ import { TelegramCommandsService } from './telegram-commands.service.js';
     TelegramAccessModule,
   ],
   providers: [TelegramCommandsService, TelegramCommandsBot],
-  exports: [TypeOrmModule, TelegramCommandsService],
+  exports: [TypeOrmModule, TelegramCommandsService, TelegramCommandsBot],
 })
 export class TelegramCommandsModule {}

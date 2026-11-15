@@ -41,6 +41,12 @@ describe('App (e2e)', () => {
       .expect(403);
   });
 
+  it('/telegram/subscriptions/send (POST) rejects requests without the secret', () => {
+    return request(app.getHttpServer())
+      .post('/telegram/subscriptions/send')
+      .expect(403);
+  });
+
   afterEach(async () => {
     await app.close();
   });

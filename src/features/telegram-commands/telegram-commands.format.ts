@@ -12,6 +12,10 @@ import { ibkrLabel } from './telegram-commands.service.js';
 
 export const TELEGRAM_MESSAGE_LIMIT = 4096;
 export const BALANCE_ARGUMENT = 'balance';
+export const MESSAGE_OPTIONS = {
+  parse_mode: 'HTML',
+  link_preview_options: { is_disabled: true },
+} as const;
 
 const MINUS = '−';
 const RULE = '━'.repeat(18);
