@@ -4,11 +4,14 @@ import type { Repository } from 'typeorm';
 import { errorMessage, toNumber } from '../../shared/http/http.js';
 import {
   ACCOUNT_SNAPSHOT_SOURCES,
+  type AccountKind,
   type AccountSnapshotSource,
 } from '../account/account-snapshot.interface.js';
 import { roundMoney, roundPositions } from '../account/positions.js';
 import { InputsService } from '../inputs/inputs.service.js';
+import { SnapshotsService } from '../snapshots/snapshots.service.js';
 import type {
+  InputSnapshot,
   OutputSnapshot,
   OutputSnapshotError,
   OwnerSnapshot,
@@ -25,6 +28,7 @@ export class OwnerService {
     private readonly inputs: InputsService,
     @Inject(ACCOUNT_SNAPSHOT_SOURCES)
     private readonly sources: AccountSnapshotSource<{ id: string }>[],
+    private readonly snapshots: SnapshotsService,
   ) {}
 
   async getSnapshot(ownerId: string): Promise<OwnerSnapshot> {
@@ -51,16 +55,19 @@ export class OwnerService {
 
     const outputs: OutputSnapshot[] = [];
     const errors: OutputSnapshotError[] = [];
+    const amountsByKind: Record<AccountKind, number> = { stocks: 0, crypto: 0 };
     results.forEach((result, index) => {
       const { source, account } = accounts[index];
       const name = source.accountName?.(account) ?? source.name;
       if (result.status === 'fulfilled') {
         const { usdAmount, positions, asOf } = result.value;
+        const amount = roundMoney(usdAmount);
+        amountsByKind[source.kind] += amount;
         outputs.push({
           id: account.id,
           source: source.name,
           name,
-          amount: roundMoney(usdAmount),
+          amount,
           currency: 'USD',
           positions: roundPositions(positions),
           asOf,
@@ -76,6 +83,27 @@ export class OwnerService {
       errors.push({ id: account.id, name, message });
     });
 
+    const inputSnapshots: InputSnapshot[] = inputs.map(
+      ({ name, amount, currency, createdAt }) => ({
+        name,
+        amount: toNumber(amount),
+        currency,
+        createdAt: createdAt.toISOString(),
+      }),
+    );
+
+    if (accounts.length > 0 && errors.length === 0) {
+      await this.snapshots.record({
+        ownerId,
+        takenAt,
+        amountStocks: roundMoney(amountsByKind.stocks),
+        amountCrypto: roundMoney(amountsByKind.crypto),
+        amountInputs: roundMoney(
+          inputSnapshots.reduce((total, { amount }) => total + amount, 0),
+        ),
+      });
+    }
+
     return {
       ownerId,
       takenAt,
@@ -83,12 +111,7 @@ export class OwnerService {
         outputs.reduce((total, { amount }) => total + amount, 0),
       ),
       totalCurrency: 'USD',
-      inputs: inputs.map(({ name, amount, currency, createdAt }) => ({
-        name,
-        amount: toNumber(amount),
-        currency,
-        createdAt: createdAt.toISOString(),
-      })),
+      inputs: inputSnapshots,
       outputs,
       errors,
     };

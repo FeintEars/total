@@ -41,6 +41,7 @@ interface EarnPage<T> {
 @Injectable()
 export class BinanceService implements AccountSnapshotSource<BinanceAccount> {
   readonly name = 'Binance';
+  readonly kind = 'crypto';
 
   constructor(
     @InjectRepository(BinanceAccount)

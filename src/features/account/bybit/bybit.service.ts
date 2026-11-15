@@ -48,6 +48,7 @@ interface EarnPositions {
 @Injectable()
 export class BybitService implements AccountSnapshotSource<BybitAccount> {
   readonly name = 'Bybit';
+  readonly kind = 'crypto';
 
   constructor(
     @InjectRepository(BybitAccount)

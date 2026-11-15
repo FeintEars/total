@@ -42,6 +42,7 @@ const RETRYABLE_ERROR_CODES = new Set([
 @Injectable()
 export class IbkrService implements AccountSnapshotSource<IbkrAccount> {
   readonly name = IBKR_SOURCE_NAME;
+  readonly kind = 'stocks';
 
   constructor(
     @InjectRepository(IbkrAccount)

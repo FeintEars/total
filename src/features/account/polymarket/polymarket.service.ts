@@ -39,6 +39,7 @@ interface PositionsPage {
 @Injectable()
 export class PolymarketService implements AccountSnapshotSource<PolymarketAccount> {
   readonly name = 'Polymarket';
+  readonly kind = 'crypto';
 
   constructor(
     @InjectRepository(PolymarketAccount)

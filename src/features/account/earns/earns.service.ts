@@ -16,6 +16,7 @@ const MS_PER_YEAR = 365 * 24 * 60 * 60 * 1000;
 @Injectable()
 export class EarnsService implements AccountSnapshotSource<Earns> {
   readonly name = 'Earns';
+  readonly kind = 'crypto';
 
   constructor(
     @InjectRepository(Earns)

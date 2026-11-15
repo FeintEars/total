@@ -23,8 +23,13 @@ export interface AccountSnapshot {
   asOf: string;
 }
 
+export const ACCOUNT_KINDS = ['stocks', 'crypto'] as const;
+export type AccountKind = (typeof ACCOUNT_KINDS)[number];
+
 export interface AccountSnapshotSource<TAccount extends { id: string }> {
   readonly name: string;
+
+  readonly kind: AccountKind;
 
   accountName?(account: TAccount): string;
 
